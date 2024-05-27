@@ -1,38 +1,45 @@
-using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class BoundaryBox : MonoBehaviour
+[RequireComponent(typeof(LineRenderer))]
+public class BoundaryVisualizer : MonoBehaviour
 {
     private LineRenderer _lineRenderer;
     private SimulationController _sm;
-    
 
     void Start()
     {
         _lineRenderer = GetComponent<LineRenderer>();
         _sm = FindObjectOfType<SimulationController>();
 
-        if (_sm == null) throw new Exception("No Simulation Controller available");
-
-        DrawBoundary();
+        if (_sm != null)
+        {
+            DrawBoundary();
+        }
     }
 
-    void DrawBoundary(){
-        float left = _sm.LeftBoundary;
-        float right = _sm.RightBoundary;
-        float top = _sm.TopBoundary;
-        float bottom = _sm.BottomBoundary;
+    void DrawBoundary()
+    {
+        _lineRenderer.positionCount = 5;
+        _lineRenderer.useWorldSpace = true;
 
-        Vector3[] points = new Vector3[5];
-        points[0] = new Vector3(left, top, 0);
-        points[1] = new Vector3(right, top, 0);
-        points[2] = new Vector3(right, bottom, 0);
-        points[3] = new Vector3(left, bottom, 0);
-        points[4] = new Vector3(left, top, 0); // Closing the rectangle
+        Vector3[] boundaryPoints = new Vector3[5];
+        boundaryPoints[0] = new Vector3(_sm.LeftBoundary-_sm.Size, _sm.TopBoundary+_sm.Size, 0);
+        boundaryPoints[1] = new Vector3(_sm.RightBoundary+_sm.Size, _sm.TopBoundary+_sm.Size, 0);
+        boundaryPoints[2] = new Vector3(_sm.RightBoundary+_sm.Size, _sm.BottomBoundary-_sm.Size, 0);
+        boundaryPoints[3] = new Vector3(_sm.LeftBoundary-_sm.Size, _sm.BottomBoundary-_sm.Size, 0);
+        boundaryPoints[4] = new Vector3(_sm.LeftBoundary-_sm.Size, _sm.TopBoundary+_sm.Size, 0); // Close the loop
 
-        _lineRenderer.positionCount = points.Length;
-        _lineRenderer.SetPositions(points);
+        _lineRenderer.SetPositions(boundaryPoints);
+        _lineRenderer.loop = true;
+    }
+
+    void OnValidate()
+    {
+        if (_lineRenderer != null && _sm != null)
+        {
+            DrawBoundary();
+        }
     }
 }
