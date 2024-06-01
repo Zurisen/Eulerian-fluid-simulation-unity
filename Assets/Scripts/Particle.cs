@@ -51,6 +51,6 @@ public class Particle : MonoBehaviour
 
         // Draw smoothing radius
         Gizmos.color = new Color(0, 1, 0, 0.25f); // Green with transparency
-        Gizmos.DrawSphere(transform.position, _sm.MainSmoothingRadius);
+        Gizmos.DrawSphere(transform.position, _sm.SmoothingRadius);
     }
 }

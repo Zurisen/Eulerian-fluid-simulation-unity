@@ -243,20 +243,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8c6a8a8b6d6d5e2e1aa44b032cfa3591, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  N: 168
+  N: 313
   ParticlesSize: 0.46
   ParticlesMass: 1
   Stifness: 1
   RestDensity: 0.1
-  InitMargin: 0.29
+  Viscosity: 1
   Gravity: -9.8
-  MainSmoothingRadius: 3
-  MainDensityKernel: 0
+  InitMargin: 0.29
+  SmoothingRadius: 3
+  DensityKernel: 0
+  ViscosityKernel: 3
   LeftBoundary: -10
   RightBoundary: 10
   TopBoundary: 10
   BottomBoundary: -9.99
-  CollisionEllasticity: 0
   _particlePrefab: {fileID: 4069813066910622888, guid: 8281435ccb30bf89cbe1832165164e95, type: 3}
 --- !u!4 &570926802
 Transform:

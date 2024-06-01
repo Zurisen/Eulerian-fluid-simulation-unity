@@ -2,11 +2,12 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum DensityKernel
+public enum Kernel
 {
     Quadratic,
     Poly6,
-    Debrun
+    Debrun,
+    Viscosity
 }
 
 
@@ -16,14 +17,16 @@ public class SimulationController : MonoBehaviour
     public uint N = 10;
     public float ParticlesSize = 1f;
     public float ParticlesMass = 1f;
-    public float Stifness = 1f;
-    public float RestDensity = 0.1f;
-    public float InitMargin = 0.5f;
+    public float Stifness = 1f; // Ideal gas equation constant
+    public float RestDensity = 0.001f; // helps with numerical stability
+    public float Viscosity = 1;
     public float Gravity = -9.8f;
     private Vector2 _gravity = Vector2.zero;
+    public float InitMargin = 0.5f;
 
-    public float MainSmoothingRadius = 3f;
-    public DensityKernel MainDensityKernel;
+    public float SmoothingRadius = 3f;
+    public Kernel DensityKernel;
+    public Kernel ViscosityKernel;
     public float LeftBoundary = -10;
     public float RightBoundary = 10;
     public float TopBoundary = 10;
@@ -55,7 +58,7 @@ public class SimulationController : MonoBehaviour
         foreach (Particle particle in _particles)
         {
             ApplyGravity(particle);
-            ApplyPressure(particle);
+            ApplyInteractions(particle);
             UpdatePosition(particle);
 
         }
@@ -66,33 +69,25 @@ public class SimulationController : MonoBehaviour
         particle.Velocity += _gravity * Time.deltaTime;
     }
 
-    void ApplyPressure(Particle particle)
+    void ApplyInteractions(Particle particle)
     {
         Vector2 pressureForce = Vector2.zero;
+        Vector2 viscosityForce = Vector2.zero;
+
         foreach (Particle neighbour in _particles)
         {
             if (particle == neighbour) continue;
             
             float distance = Vector2.Distance(particle.transform.position, neighbour.transform.position);
             Vector2 direction = (particle.transform.position - neighbour.transform.position).normalized;
-            float gradient = KernelFunctionGradient(MainSmoothingRadius+0.0004f, distance+0.0004f);
-            pressureForce += -particle.Mass * (particle.Pressure + neighbour.Pressure) / (2 * neighbour.Density) * gradient * direction;
-        }
-        particle.Velocity += (pressureForce/particle.Density) * Time.deltaTime;
-    }
+            float gradient = KernelFunctionGradient(DensityKernel, SmoothingRadius+0.0004f, distance+0.0004f);
+            float laplacian = KernelFunctionLaplacian(ViscosityKernel, SmoothingRadius+0.0004f, distance+0.0004f);
 
-    float KernelFunctionGradient(float smoothingRadius, float distance){
-        switch (MainDensityKernel)
-        {
-            case DensityKernel.Quadratic:
-                return QuadraticDensityKernel.Calculate(smoothingRadius, distance);  
-            case DensityKernel.Poly6:
-                return Poly6DensityKernel.Calculate(smoothingRadius, distance);
-            case DensityKernel.Debrun:
-                return DebrunDensityKernel.Calculate(smoothingRadius, distance);
-            default:
-                throw new ArgumentException("Not implemented Density Kernel");
+            pressureForce += -neighbour.Mass * (particle.Pressure + neighbour.Pressure) / (2 * neighbour.Density) * gradient * direction;
+            viscosityForce += neighbour.Mass * (neighbour.Velocity - neighbour.Velocity) / neighbour.Density * laplacian;
+
         }
+        particle.Velocity +=  (pressureForce + viscosityForce) /particle.Density * Time.deltaTime;
     }
 
     void CalculateDensityAndPressure(Particle particle)
@@ -102,26 +97,50 @@ public class SimulationController : MonoBehaviour
         {
             if (neighbour == particle) continue;
             float distance = Vector2.Distance(particle.transform.position, neighbour.transform.position);
-            density += neighbour.Mass * (-1) * KernelFunction(MainSmoothingRadius+0.0004f, distance+0.0004f); // -1 because they attract each other otherwise
+            density += neighbour.Mass * (-1) * KernelFunction(DensityKernel, SmoothingRadius+0.0004f, distance+0.0004f); // -1 because they attract each other otherwise
         } 
         particle.Density = density;
         particle.Pressure = Stifness * density;
     }
 
-    float KernelFunction(float smoothingRadius, float distance)
+
+    float KernelFunction(Kernel kernel, float smoothingRadius, float distance)
     {
-        switch (MainDensityKernel)
+        switch (DensityKernel)
         {
-            case DensityKernel.Quadratic:
-                return QuadraticDensityKernel.Calculate(smoothingRadius, distance);  
-            case DensityKernel.Poly6:
-                return Poly6DensityKernel.Calculate(smoothingRadius, distance);
-            case DensityKernel.Debrun:
-                return DebrunDensityKernel.Calculate(smoothingRadius, distance);
+            case Kernel.Quadratic:
+                return QuadraticKernel.Calculate(smoothingRadius, distance);  
+            case Kernel.Poly6:
+                return Poly6Kernel.Calculate(smoothingRadius, distance);
+            case Kernel.Debrun:
+                return DebrunKernel.Calculate(smoothingRadius, distance);
             default:
                 throw new ArgumentException("Not implemented Density Kernel");
         }
 
+    }
+    float KernelFunctionGradient(Kernel kernel, float smoothingRadius, float distance){
+        switch (kernel)
+        {
+            case Kernel.Quadratic:
+                return QuadraticKernel.Gradient(smoothingRadius, distance);  
+            case Kernel.Poly6:
+                return Poly6Kernel.Gradient(smoothingRadius, distance);
+            case Kernel.Debrun:
+                return DebrunKernel.Gradient(smoothingRadius, distance);
+            default:
+                throw new ArgumentException("Not implemented Gradient for this Density Kernel");
+        }
+    }
+
+    float KernelFunctionLaplacian(Kernel kernel, float smoothingRadius, float distance){
+        switch(kernel)
+        {
+            case Kernel.Viscosity:
+                return ViscKernel.Laplacian(smoothingRadius, distance);   
+            default:
+                throw new ArgumentException("Not implemented Laplacian for this Density Kernel");
+        }
     }
 
 
@@ -244,7 +263,7 @@ public class SimulationController : MonoBehaviour
 /// <summary>
 ///  Kernel functions and their gradients
 /// </summary>
-public static class QuadraticDensityKernel{
+public static class QuadraticKernel{
     public static float Calculate(float smoothingRadius, float distance)
     {
         return Mathf.Pow(1-distance/smoothingRadius, 2);
@@ -256,7 +275,7 @@ public static class QuadraticDensityKernel{
     }
 }
 
-public static class DebrunDensityKernel{
+public static class DebrunKernel{
 
     public static float Calculate(float smoothingRadius, float distance)
     {
@@ -271,7 +290,7 @@ public static class DebrunDensityKernel{
 
 }
 
-public static class Poly6DensityKernel{
+public static class Poly6Kernel{
 
     public static float Calculate(float smoothingRadius, float distance)
     {
@@ -284,3 +303,11 @@ public static class Poly6DensityKernel{
     }
 
 }    
+
+public static class ViscKernel{
+    public static float Laplacian (float smoothingRadius, float distance)
+    {
+        if (distance > smoothingRadius) return 0;
+        return ( 45/(Mathf.PI*Mathf.Pow(smoothingRadius, 6)) )* (smoothingRadius - distance);
+    }
+}
