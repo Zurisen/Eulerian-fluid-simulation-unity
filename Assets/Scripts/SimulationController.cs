@@ -17,12 +17,12 @@ public class SimulationController : MonoBehaviour
 
     public float Stifness = 1f; // Ideal gas equation constant
     public float RestDensity = 0.001f; // helps with numerical stability
-    public float Viscosity = 1;
+    //public float Viscosity = 1;
     public float Gravity = -9.8f;
     private Vector2 _gravity = Vector2.zero;
     public float SmoothingRadius = 3f;
     public Kernel DensityKernel;
-    public Kernel ViscosityKernel;
+    private Kernel ViscosityKernel = Kernel.Viscosity;
 
     private List<Particle> _particles;
 
@@ -93,7 +93,6 @@ public class SimulationController : MonoBehaviour
             viscosityForce += Vector2.zero;//neighbour.Mass * (neighbour.Velocity - neighbour.Velocity) / neighbour.Density * laplacian;
         }
         particle.Velocity += (pressureForce + viscosityForce) /particle.Density * Time.deltaTime;
-        print(Time.deltaTime);
 
     }
 
@@ -155,7 +154,7 @@ public class SimulationController : MonoBehaviour
 
     void UpdatePosition(Particle particle)
     {
-
+        particle.UpdateParticleColor();
         particle.transform.Translate(particle.Velocity*Time.deltaTime);
         ResolveBoundariesCollision(particle);
     }

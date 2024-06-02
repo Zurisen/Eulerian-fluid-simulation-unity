@@ -15,16 +15,19 @@ public class ParticleSpawner : MonoBehaviour
     private GameObject _particlePrefab;
     private List<Particle> _particles;
 
+
     void Awake()
     {
         _particles = new List<Particle>();
         SpawnParticles();
     }
 
+
     public List<Particle> GetParticles()
     {
         return _particles;
     }
+
 
     void SpawnParticles()
     {
@@ -67,10 +70,12 @@ public class ParticleSpawner : MonoBehaviour
         }
     }
 
+
     void OnDrawGizmos()
     {
         Gizmos.color = Color.blue;
         Gizmos.DrawWireCube(transform.position, new Vector3(Width, Height, 0));
+        
     }
 
 }
