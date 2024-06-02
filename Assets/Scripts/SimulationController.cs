@@ -14,36 +14,42 @@ public enum Kernel
 
 public class SimulationController : MonoBehaviour
 {
-    public uint N = 10;
-    public float ParticlesSize = 1f;
-    public float ParticlesMass = 1f;
-    public float SpawnRandomness = 0.1f;
+
     public float Stifness = 1f; // Ideal gas equation constant
     public float RestDensity = 0.001f; // helps with numerical stability
     public float Viscosity = 1;
     public float Gravity = -9.8f;
     private Vector2 _gravity = Vector2.zero;
-    public float InitMargin = 0.5f;
-
     public float SmoothingRadius = 3f;
     public Kernel DensityKernel;
     public Kernel ViscosityKernel;
-    public float LeftBoundary = -10;
-    public float RightBoundary = 10;
-    public float TopBoundary = 10;
-    public float BottomBoundary = -10;
-
-
-    [SerializeField]
-    private GameObject _particlePrefab;
 
     private List<Particle> _particles;
 
+    [SerializeField]
+    private GameObject _fluidSpawner;
 
-    void Awake(){
+    private ParticleSpawner _particleSpawner;
+
+
+    void Awake()
+    {
         _gravity = new Vector2(0, Gravity * Time.deltaTime);
-        _particles = new List<Particle>();
-        SpawnParticles();
+        
+        if (_fluidSpawner == null)
+        {
+            throw new Exception("Particle Spawner Object needed to run simulation.");
+        }
+
+        // Get the ParticleSpawner component from the SpawnerObject
+        _particleSpawner = _fluidSpawner.GetComponent<ParticleSpawner>();
+        if (_particleSpawner == null)
+        {
+            throw new Exception("ParticleSpawner component not found on SpawnerObject.");
+        }
+
+        _particles = _particleSpawner.GetParticles();
+
     }
 
 
@@ -155,167 +161,37 @@ public class SimulationController : MonoBehaviour
     }
 
 
-    void ResolveBoundariesCollision(Particle particle){
+    void ResolveBoundariesCollision(Particle particle)
+    {
+        Vector3 particlePosition = particle.transform.position;
+        float halfWidth = _particleSpawner.Width / 2f - particle.transform.localScale.x/2;
+        float halfHeight = _particleSpawner.Height / 2f - particle.transform.localScale.x/2;
+        Vector3 spawnerCenter = _particleSpawner.transform.position;
 
-        Vector2 particlePosition = particle.transform.position;
-        if (particlePosition.x > RightBoundary)
+        if (particlePosition.x > spawnerCenter.x + halfWidth)
         {
-            particlePosition.x = RightBoundary;
-            particle.Velocity.x = -particle.Velocity.x; // Reverse velocity on collision
+            particlePosition.x = spawnerCenter.x + halfWidth;
+            particle.Velocity.x = -particle.Velocity.x;
         }
-        else if (particlePosition.x < LeftBoundary)
+        else if (particlePosition.x < spawnerCenter.x - halfWidth)
         {
-            particlePosition.x = LeftBoundary;
-            particle.Velocity.x = -particle.Velocity.x; // Reverse velocity on collision
+            particlePosition.x = spawnerCenter.x - halfWidth;
+            particle.Velocity.x = -particle.Velocity.x;
         }
 
-        if (particlePosition.y > TopBoundary)
+        if (particlePosition.y > spawnerCenter.y + halfHeight)
         {
-            particlePosition.y = TopBoundary;
-            particle.Velocity.y = -particle.Velocity.y; // Reverse velocity on collision
+            particlePosition.y = spawnerCenter.y + halfHeight;
+            particle.Velocity.y = -particle.Velocity.y;
         }
-        else if (particlePosition.y < BottomBoundary)
+        else if (particlePosition.y < spawnerCenter.y - halfHeight)
         {
-            particlePosition.y = BottomBoundary;
-            particle.Velocity.y = -particle.Velocity.y; // Reverse velocity on collision
+            particlePosition.y = spawnerCenter.y - halfHeight;
+            particle.Velocity.y = -particle.Velocity.y;
         }
 
         particle.transform.position = particlePosition;
     }
 
-    void SpawnParticles()
-    {
-        float areaWidth = RightBoundary - LeftBoundary;
-        float areaHeight = TopBoundary - BottomBoundary;
-        float particleDiameter = ParticlesSize + InitMargin;
-
-        int maxColumns = Mathf.FloorToInt(areaWidth / particleDiameter);
-        int maxRows = Mathf.FloorToInt(areaHeight / particleDiameter);
-
-        int particlesSpawned = 0;
-        System.Random random = new System.Random();
-
-        for (uint i = 0; i < maxRows && particlesSpawned < N; i++)
-        {
-            for (uint j = 0; j < maxColumns && particlesSpawned < N; j++)
-            {
-                float x = LeftBoundary + particleDiameter / 2 + j * particleDiameter;
-                float y = (BottomBoundary+TopBoundary)/2 + particleDiameter / 2 + i * particleDiameter;
-
-                if (x + particleDiameter / 2 > RightBoundary || y + particleDiameter / 2 > TopBoundary)
-                {
-                    continue;
-                }
-
-                // Add slight randomness to the initial spawn position
-                x += (float)(random.NextDouble() * 2 - 1) * SpawnRandomness;
-                y += (float)(random.NextDouble() * 2 - 1) * SpawnRandomness;
-
-                Vector3 position = new Vector3(x, y, 0);
-                GameObject particleObject = Instantiate(_particlePrefab, position, Quaternion.identity);
-                Particle particleScript = particleObject.GetComponent<Particle>();
-                if (particleObject != null)
-                {
-                    particleScript.ChangeParticleSize(ParticlesSize);
-                }
-                _particles.Add(particleScript);
-                particlesSpawned++;
-            }
-        }
-    }
-
-        // Draw gizmos to visualize the simulation area and particles in the Scene view
-    void OnDrawGizmos()
-    {
-        Gizmos.color = Color.red;
-        Gizmos.DrawLine(new Vector3(LeftBoundary, TopBoundary, 0), new Vector3(RightBoundary, TopBoundary, 0));
-        Gizmos.DrawLine(new Vector3(RightBoundary, TopBoundary, 0), new Vector3(RightBoundary, BottomBoundary, 0));
-        Gizmos.DrawLine(new Vector3(RightBoundary, BottomBoundary, 0), new Vector3(LeftBoundary, BottomBoundary, 0));
-        Gizmos.DrawLine(new Vector3(LeftBoundary, BottomBoundary, 0), new Vector3(LeftBoundary, TopBoundary, 0));
-        if (_particles == null)
-        {
-            float areaWidth = RightBoundary - LeftBoundary;
-            float areaHeight = TopBoundary - BottomBoundary;
-            float particleDiameter = ParticlesSize + InitMargin;
-
-            int maxColumns = Mathf.FloorToInt(areaWidth / particleDiameter);
-            int maxRows = Mathf.FloorToInt(areaHeight / particleDiameter);
-
-            int particlesSpawned = 0;
-            for (int i = 0; i < maxRows && particlesSpawned < N; i++)
-            {
-                for (int j = 0; j < maxColumns && particlesSpawned < N; j++)
-                {
-                    float x = LeftBoundary + particleDiameter / 2 + j * particleDiameter;
-                    float y = BottomBoundary + particleDiameter / 2 + i * particleDiameter;
-
-                    if (x + particleDiameter / 2 > RightBoundary || y + particleDiameter / 2 > TopBoundary)
-                    {
-                        continue;
-                    }
-
-                    Vector3 position = new Vector3(x, y, 0);
-                    Gizmos.color = Color.yellow;
-                    Gizmos.DrawWireSphere(position, ParticlesSize / 2);
-                    particlesSpawned++;
-                }
-            }
-        }
-    }
 }
 
-
-
-
-/// <summary>
-///  Kernel functions and their gradients
-/// </summary>
-public static class QuadraticKernel{
-    public static float Calculate(float smoothingRadius, float distance)
-    {
-        return Mathf.Pow(1-distance/smoothingRadius, 2);
-    }
-
-    public static float Gradient(float smoothingRadius, float distance)
-    {
-        if (distance > smoothingRadius) return 0;
-        return (float)(( 2*(smoothingRadius-distance) ) / Math.Pow(smoothingRadius, 2));
-    }
-}
-
-public static class DebrunKernel{
-
-    public static float Calculate(float smoothingRadius, float distance)
-    {
-        if (distance > smoothingRadius) return 0;
-        return ( 15/(Mathf.PI*Mathf.Pow(smoothingRadius,6)) )* Mathf.Pow(smoothingRadius-distance, 3);
-    }
-
-    public static float Gradient(float smoothingRadius, float distance){
-        if (distance > smoothingRadius) return 0;
-        return ( -45/(Mathf.PI*Mathf.Pow(smoothingRadius,6)) )*Mathf.Pow(smoothingRadius-distance, 2);
-    }
-
-}
-
-public static class Poly6Kernel{
-
-    public static float Calculate(float smoothingRadius, float distance)
-    {
-        if (distance > smoothingRadius) return 0;
-        return ( 315/(64*Mathf.PI*Mathf.Pow(smoothingRadius,9)) )* Mathf.Pow(Mathf.Pow(smoothingRadius,2)-Mathf.Pow(distance,2), 3);
-    }
-    public static float Gradient(float smoothingRadius, float distance){
-        if (distance > smoothingRadius) return 0;
-        return ( -945*distance/(32*Mathf.PI*Mathf.Pow(smoothingRadius,9)) )*Mathf.Pow(Mathf.Pow(smoothingRadius,2)-Mathf.Pow(distance,2), 2);
-    }
-
-}    
-
-public static class ViscKernel{
-    public static float Laplacian (float smoothingRadius, float distance)
-    {
-        if (distance > smoothingRadius) return 0;
-        return ( 45/(Mathf.PI*Mathf.Pow(smoothingRadius, 6)) )* (smoothingRadius - distance);
-    }
-}

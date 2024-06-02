@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 454508897854666196}
   m_Layer: 0
   m_Name: Particle
-  m_TagString: Particle
+  m_TagString: FluidParticle
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -98,3 +98,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   Velocity: {x: 0, y: 0}
+  Mass: 0
+  Density: 0
+  Pressure: 0

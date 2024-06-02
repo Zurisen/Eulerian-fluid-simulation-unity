@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
@@ -8,25 +9,18 @@ using UnityEngine;
 public class Particle : MonoBehaviour
 {
     public Vector2 Velocity = Vector2.zero;
-    public float Mass;
-    public float Density;
-    public float Pressure;
+    public float Mass {get; set;}
+    public float Density {get; set;}
+    public float Pressure {get; set;}
+
+    
+    [SerializeField]
     private SimulationController _sm;
 
-
-    // Start is called before the first frame update
-    void Start()
-    {
-        _sm = FindObjectOfType<SimulationController>();
-        SetupParticleParams();
+    void Awake(){
+        _sm = GetComponent<SimulationController>();
     }
 
-
-
-    void SetupParticleParams(){
-        ChangeParticleSize(_sm.ParticlesSize);
-        Mass = _sm.ParticlesMass;
-    }
 
     public void ChangeParticleSize(float size){
         transform.transform.localScale = new Vector2(size, size);
@@ -39,7 +33,7 @@ public class Particle : MonoBehaviour
     void OnDrawGizmos()
     {
         Gizmos.color = Color.white;
-        Gizmos.DrawSphere(transform.position, transform.localScale.x / 2);
+        Gizmos.DrawWireSphere(transform.position, transform.localScale.x / 2);
 
         // Draw density and pressure
         GUIStyle style = new GUIStyle();
