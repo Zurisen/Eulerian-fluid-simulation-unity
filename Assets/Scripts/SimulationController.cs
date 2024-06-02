@@ -17,6 +17,7 @@ public class SimulationController : MonoBehaviour
     public uint N = 10;
     public float ParticlesSize = 1f;
     public float ParticlesMass = 1f;
+    public float SpawnRandomness = 0.1f;
     public float Stifness = 1f; // Ideal gas equation constant
     public float RestDensity = 0.001f; // helps with numerical stability
     public float Viscosity = 1;
@@ -46,9 +47,7 @@ public class SimulationController : MonoBehaviour
     }
 
 
-    // Update is called once per frame
-    void Update()
-    {
+    void Update(){
         foreach (Particle particle in _particles)
         {
             CalculateDensityAndPressure(particle);
@@ -63,6 +62,7 @@ public class SimulationController : MonoBehaviour
 
         }
     }
+
 
     void ApplyGravity(Particle particle)
     {
@@ -80,14 +80,15 @@ public class SimulationController : MonoBehaviour
             
             float distance = Vector2.Distance(particle.transform.position, neighbour.transform.position);
             Vector2 direction = (particle.transform.position - neighbour.transform.position).normalized;
-            float gradient = KernelFunctionGradient(DensityKernel, SmoothingRadius+0.0004f, distance+0.0004f);
-            float laplacian = KernelFunctionLaplacian(ViscosityKernel, SmoothingRadius+0.0004f, distance+0.0004f);
+            float gradient = -KernelFunctionGradient(DensityKernel, SmoothingRadius+0.0004f, distance+0.0004f);
+            float laplacian = -KernelFunctionLaplacian(ViscosityKernel, SmoothingRadius+0.0004f, distance+0.0004f);
 
-            pressureForce += -neighbour.Mass * (particle.Pressure + neighbour.Pressure) / (2 * neighbour.Density) * gradient * direction;
-            viscosityForce += neighbour.Mass * (neighbour.Velocity - neighbour.Velocity) / neighbour.Density * laplacian;
-
+            pressureForce += neighbour.Mass * (particle.Pressure + neighbour.Pressure) / (2 * neighbour.Density) * gradient * direction;
+            viscosityForce += Vector2.zero;//neighbour.Mass * (neighbour.Velocity - neighbour.Velocity) / neighbour.Density * laplacian;
         }
-        particle.Velocity +=  (pressureForce + viscosityForce) /particle.Density * Time.deltaTime;
+        particle.Velocity += (pressureForce + viscosityForce) /particle.Density * Time.deltaTime;
+        print(Time.deltaTime);
+
     }
 
     void CalculateDensityAndPressure(Particle particle)
@@ -97,7 +98,7 @@ public class SimulationController : MonoBehaviour
         {
             if (neighbour == particle) continue;
             float distance = Vector2.Distance(particle.transform.position, neighbour.transform.position);
-            density += neighbour.Mass * (-1) * KernelFunction(DensityKernel, SmoothingRadius+0.0004f, distance+0.0004f); // -1 because they attract each other otherwise
+            density += neighbour.Mass * KernelFunction(DensityKernel, SmoothingRadius+0.0004f, distance+0.0004f); // -1 because they attract each other otherwise
         } 
         particle.Density = density;
         particle.Pressure = Stifness * density;
@@ -192,17 +193,23 @@ public class SimulationController : MonoBehaviour
         int maxRows = Mathf.FloorToInt(areaHeight / particleDiameter);
 
         int particlesSpawned = 0;
+        System.Random random = new System.Random();
+
         for (uint i = 0; i < maxRows && particlesSpawned < N; i++)
         {
             for (uint j = 0; j < maxColumns && particlesSpawned < N; j++)
             {
-                float x = LeftBoundary+ particleDiameter / 2 + j * particleDiameter;
-                float y = BottomBoundary+ particleDiameter / 2 + i * particleDiameter;
+                float x = LeftBoundary + particleDiameter / 2 + j * particleDiameter;
+                float y = (BottomBoundary+TopBoundary)/2 + particleDiameter / 2 + i * particleDiameter;
 
                 if (x + particleDiameter / 2 > RightBoundary || y + particleDiameter / 2 > TopBoundary)
                 {
                     continue;
                 }
+
+                // Add slight randomness to the initial spawn position
+                x += (float)(random.NextDouble() * 2 - 1) * SpawnRandomness;
+                y += (float)(random.NextDouble() * 2 - 1) * SpawnRandomness;
 
                 Vector3 position = new Vector3(x, y, 0);
                 GameObject particleObject = Instantiate(_particlePrefab, position, Quaternion.identity);
@@ -271,7 +278,8 @@ public static class QuadraticKernel{
 
     public static float Gradient(float smoothingRadius, float distance)
     {
-        return (float)(( -2*(smoothingRadius-distance) ) / Math.Pow(smoothingRadius, 2));
+        if (distance > smoothingRadius) return 0;
+        return (float)(( 2*(smoothingRadius-distance) ) / Math.Pow(smoothingRadius, 2));
     }
 }
 
