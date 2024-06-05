@@ -14,7 +14,6 @@ public class Particle : MonoBehaviour
     public float Pressure {get; set;}
     public Color PColor {get; set;}
     
-    [SerializeField]
     private SimulationController _sm;
     private SpriteRenderer _spriteRenderer;
     void Awake(){
