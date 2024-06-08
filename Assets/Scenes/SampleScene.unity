@@ -214,6 +214,59 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &555841073
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 555841075}
+  - component: {fileID: 555841074}
+  m_Layer: 0
+  m_Name: FluidSpawner
+  m_TagString: FluidSpawner
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &555841074
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 555841073}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 882de7b542b22f3c8a1e3c6caff45ff8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  N: 452
+  ParticlesMass: 1
+  ParticlesSize: 0.2
+  ParticlesAuraRadius: 10
+  SpawnRandomness: 0.36
+  InitMargin: 0.63
+  Width: 26.5
+  Height: 14.7
+  _particlePrefab: {fileID: 4135162717968993169, guid: 088ee36f1afed5999a86efaa31314527, type: 3}
+--- !u!4 &555841075
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 555841073}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: -0.0044072038}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &570926800
 GameObject:
   m_ObjectHideFlags: 0
@@ -243,13 +296,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8c6a8a8b6d6d5e2e1aa44b032cfa3591, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Stifness: 5.34
+  ChangeParticlesColor: 1
+  ShowSmoothingRadius: 0
+  Stifness: 1.1
   RestDensity: 0.1
-  Gravity: -9.8
+  TargetDensity: 0.55
+  Gravity: 0
   PressureForceIntensity: 1
-  SmoothingRadius: 3
+  SmoothingRadius: 5
   DensityKernel: 2
-  _fluidSpawner: {fileID: 1519942291}
+  _fluidSpawner: {fileID: 555841073}
 --- !u!4 &570926802
 Transform:
   m_ObjectHideFlags: 0
@@ -265,62 +321,10 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1519942291
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1519942293}
-  - component: {fileID: 1519942292}
-  m_Layer: 0
-  m_Name: FluidSpawner
-  m_TagString: FluidSpawner
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1519942292
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1519942291}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 882de7b542b22f3c8a1e3c6caff45ff8, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  N: 100
-  ParticlesMass: 1
-  ParticlesSize: 0.43
-  SpawnRandomness: 0.1
-  InitMargin: 0.63
-  Width: 13.98
-  Height: 10.01
-  _particlePrefab: {fileID: 4069813066910622888, guid: 8281435ccb30bf89cbe1832165164e95, type: 3}
---- !u!4 &1519942293
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1519942291}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -0.0044072038}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 519420032}
   - {fileID: 570926802}
-  - {fileID: 1519942293}
+  - {fileID: 555841075}

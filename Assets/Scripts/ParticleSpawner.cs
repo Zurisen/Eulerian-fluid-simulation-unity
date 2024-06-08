@@ -6,6 +6,7 @@ public class ParticleSpawner : MonoBehaviour
     public uint N = 10;
     public float ParticlesMass = 1f;
     public float ParticlesSize = 1f;
+    public float ParticlesAuraRadius = 0f;
     public float SpawnRandomness = 0.1f;
     public float InitMargin = 0.5f;
     public float Width = 10f;
@@ -63,6 +64,7 @@ public class ParticleSpawner : MonoBehaviour
                 {
                     particleScript.Mass = ParticlesMass;
                     particleScript.ChangeParticleSize(ParticlesSize);
+                    particleScript.ChangeParticleAuraRadius(ParticlesAuraRadius);
                 }
                 _particles.Add(particleScript);
                 particlesSpawned++;

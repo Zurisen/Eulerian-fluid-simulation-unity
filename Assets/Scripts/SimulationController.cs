@@ -12,11 +12,13 @@ public enum Kernel
 
 public class SimulationController : MonoBehaviour
 {
+    public bool ChangeParticlesColor = false;
+    public bool ShowSmoothingRadius = false;
     public float Stifness = 1f; // Ideal gas equation constant
     public float RestDensity = 0.001f; // helps with numerical stability
+    public float TargetDensity = 0.6f;
     public float Gravity = -9.8f;
     public float PressureForceIntensity = 1f;
-    private Vector2 _gravity = Vector2.zero;
     public float SmoothingRadius = 3f;
     public Kernel DensityKernel;
     private Kernel ViscosityKernel = Kernel.Viscosity;
@@ -31,7 +33,6 @@ public class SimulationController : MonoBehaviour
 
     void Awake()
     {
-        _gravity = new Vector2(0, Gravity * Time.deltaTime);
         
         if (_fluidSpawner == null)
         {
@@ -43,10 +44,13 @@ public class SimulationController : MonoBehaviour
         {
             throw new Exception("ParticleSpawner component not found on SpawnerObject.");
         }
+        if (ShowSmoothingRadius) _particleSpawner.ParticlesAuraRadius = SmoothingRadius;
+
 
         _particles = _particleSpawner.GetParticles();
         _spatialHash = new SpatialHash(SmoothingRadius);
     }
+
 
     void Update()
     {
@@ -73,7 +77,8 @@ public class SimulationController : MonoBehaviour
 
     void ApplyGravity(Particle particle)
     {
-        particle.Velocity += _gravity * Time.deltaTime;
+
+        particle.Velocity += new Vector2(0, Gravity) * Time.deltaTime;
     }
 
     void ApplyInteractions(Particle particle)
@@ -95,7 +100,8 @@ public class SimulationController : MonoBehaviour
             pressureForce += neighbour.Mass * (particle.Pressure + neighbour.Pressure) / (2 * neighbour.Density) * gradient * direction;
             viscosityForce += Vector2.zero; //neighbour.Mass * (neighbour.Velocity - neighbour.Velocity) / neighbour.Density * laplacian;
         }
-        particle.Velocity += (PressureForceIntensity* pressureForce + viscosityForce) /particle.Density * Time.deltaTime;
+        float diffDensity = TargetDensity >= 0.05 ? Math.Abs(TargetDensity - particle.Density) : 1;
+        particle.Velocity += (diffDensity*PressureForceIntensity* pressureForce + viscosityForce) /particle.Density * Time.deltaTime;
     }
 
     void CalculateDensityAndPressure(Particle particle)
@@ -156,7 +162,7 @@ public class SimulationController : MonoBehaviour
 
     void UpdatePosition(Particle particle)
     {
-        particle.UpdateParticleColor();
+        if (ChangeParticlesColor) particle.UpdateParticleColor();
         particle.transform.Translate(particle.Velocity * Time.deltaTime);
         ResolveBoundariesCollision(particle);
     }

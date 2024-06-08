@@ -9,22 +9,52 @@ using UnityEngine;
 public class Particle : MonoBehaviour
 {
     public Vector2 Velocity = Vector2.zero;
-    public float Mass {get; set;}
-    public float Density {get; set;}
-    public float Pressure {get; set;}
-    public Color PColor {get; set;}
-    
+    public float Mass;
+    public float Density;
+    public float Pressure;
+    public Color PColor;
+    public Color AuraColor;
+
     private SimulationController _sm;
     private SpriteRenderer _spriteRenderer;
-    void Awake(){
-        _sm = GetComponent<SimulationController>();
+    private SpriteRenderer _auraSpriteRenderer;
+
+    void Awake()
+    {
         _spriteRenderer = GetComponent<SpriteRenderer>();
         PColor = _spriteRenderer.color;
+
+        // Find the "Aura" child GameObject and get its SpriteRenderer component
+        
+        Transform auraTransform = transform.Find("Aura");
+        if (auraTransform != null)
+        {
+            _auraSpriteRenderer = auraTransform.GetComponent<SpriteRenderer>();
+            if (_auraSpriteRenderer != null)
+            {
+                Debug.Log("Aura SpriteRenderer found and assigned.");
+            }
+
+        }
+
     }
 
 
-    public void ChangeParticleSize(float size){
-        transform.transform.localScale = new Vector2(size, size);
+    public void ChangeParticleSize(float size)
+    {
+        transform.localScale = new Vector2(size, size);
+        if (_auraSpriteRenderer != null)
+        {
+            _auraSpriteRenderer.transform.localScale = new Vector2(size * 2, size * 2);
+        }
+    }
+
+    public void ChangeParticleAuraRadius(float radius)
+    {
+        if (_auraSpriteRenderer != null)
+        {
+            _auraSpriteRenderer.transform.localScale = new Vector2(radius, radius);
+        }
 
     }
 
@@ -35,9 +65,21 @@ public class Particle : MonoBehaviour
         float t = Mathf.Clamp01(speed / maxSpeed);
         Color newColor = Color.Lerp(PColor, Color.white, t);
         _spriteRenderer.color = newColor;
+
+        // Optionally, update the aura color as well
+        if (_auraSpriteRenderer != null)
+        {
+            _auraSpriteRenderer.color = new Color(newColor.r, newColor.g, newColor.b, 0.5f);
+        }
     }
 
-
+    public void ToggleAuraVisibility(bool isVisible)
+    {
+        if (_auraSpriteRenderer != null)
+        {
+            _auraSpriteRenderer.enabled = isVisible;
+        }
+    }
 
     // Draw gizmos to visualize the particle in the Scene view
     void OnDrawGizmos()
