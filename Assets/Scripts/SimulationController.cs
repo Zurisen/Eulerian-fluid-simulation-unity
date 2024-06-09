@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using UnityEngine;
 
 public enum Kernel
@@ -31,9 +32,13 @@ public class SimulationController : MonoBehaviour
 
     private ParticleSpawner _particleSpawner;
 
+    private List<Vector2> positions;
+    private List<Vector2> velocities;
+
+    private float deltaTime;
+
     void Awake()
     {
-        
         if (_fluidSpawner == null)
         {
             throw new Exception("Particle Spawner Object needed to run simulation.");
@@ -46,77 +51,91 @@ public class SimulationController : MonoBehaviour
         }
         if (ShowSmoothingRadius) _particleSpawner.ParticlesAuraRadius = SmoothingRadius;
 
-
         _particles = _particleSpawner.GetParticles();
         _spatialHash = new SpatialHash(SmoothingRadius);
-    }
 
+        // Initialize position and velocity lists
+        positions = new List<Vector2>(_particles.Count);
+        velocities = new List<Vector2>(_particles.Count);
+        foreach (var particle in _particles)
+        {
+            positions.Add(particle.transform.position);
+            velocities.Add(particle.Velocity);
+        }
+        deltaTime = Time.deltaTime;
+
+    }
 
     void Update()
     {
         _spatialHash.Clear();
 
-        foreach (Particle particle in _particles)
+        for (int i = 0; i < _particles.Count; i++)
         {
-            _spatialHash.Insert(particle);
+            _spatialHash.Insert(i, positions[i]);
         }
 
-        foreach (Particle particle in _particles)
+        Parallel.For(0, _particles.Count, i =>
         {
-            CalculateDensityAndPressure(particle);
+            CalculateDensityAndPressure(i);
+        });
+
+        Parallel.For(0, _particles.Count, i =>
+        {
+            ApplyGravity(i);
+            ApplyInteractions(i);
+        });
+
+        for (int i = 0; i < _particles.Count; i++)
+        {
+            UpdatePositionsAndVelocities(i);
         }
 
-        foreach (Particle particle in _particles)
-        {
-            ApplyGravity(particle);
-            ApplyInteractions(particle);
-            UpdatePosition(particle);
-
-        }
     }
 
-    void ApplyGravity(Particle particle)
+    void ApplyGravity(int index)
     {
-
-        particle.Velocity += new Vector2(0, Gravity) * Time.deltaTime;
+        velocities[index] += new Vector2(0, Gravity) * deltaTime;
     }
 
-    void ApplyInteractions(Particle particle)
+    void ApplyInteractions(int index)
     {
         Vector2 pressureForce = Vector2.zero;
         Vector2 viscosityForce = Vector2.zero;
 
-        List<Particle> neighbors = _spatialHash.GetNeighbors(particle.transform.position, SmoothingRadius);
+        List<int> neighborIndices = _spatialHash.GetNeighbors(positions[index], SmoothingRadius);
 
-        foreach (Particle neighbour in neighbors)
+        foreach (int neighborIndex in neighborIndices)
         {
-            if (particle == neighbour) continue;
-            
-            float distance = Vector2.Distance(particle.transform.position, neighbour.transform.position);
-            Vector2 direction = (particle.transform.position - neighbour.transform.position).normalized;
-            float gradient = -KernelFunctionGradient(DensityKernel, SmoothingRadius+0.0004f, distance+0.0004f);
-            float laplacian = -KernelFunctionLaplacian(ViscosityKernel, SmoothingRadius+0.0004f, distance+0.0004f);
+            if (neighborIndex == index) continue;
 
-            pressureForce += neighbour.Mass * (particle.Pressure + neighbour.Pressure) / (2 * neighbour.Density) * gradient * direction;
-            viscosityForce += Vector2.zero; //neighbour.Mass * (neighbour.Velocity - neighbour.Velocity) / neighbour.Density * laplacian;
+            float distance = Vector2.Distance(positions[index], positions[neighborIndex]);
+            Vector2 direction = (positions[index] - positions[neighborIndex]).normalized;
+            float gradient = -KernelFunctionGradient(DensityKernel, SmoothingRadius + 0.0004f, distance + 0.0004f);
+            float laplacian = -KernelFunctionLaplacian(ViscosityKernel, SmoothingRadius + 0.0004f, distance + 0.0004f);
+
+            Particle neighbor = _particles[neighborIndex];
+            pressureForce += neighbor.Mass * (neighbor.Pressure) / (2 * neighbor.Density) * gradient * direction;
+            viscosityForce += Vector2.zero; //neighbor.Mass * (neighbor.Velocity - neighbor.Velocity) / neighbor.Density * laplacian;
         }
-        float diffDensity = TargetDensity >= 0.05 ? Math.Abs(TargetDensity - particle.Density) : 1;
-        particle.Velocity += (diffDensity*PressureForceIntensity* pressureForce + viscosityForce) /particle.Density * Time.deltaTime;
+        float diffDensity = TargetDensity >= 0.05 ? Math.Abs(TargetDensity - _particles[index].Density) : 1;
+        velocities[index] += (diffDensity * PressureForceIntensity * pressureForce + viscosityForce) / _particles[index].Density * deltaTime;
+
     }
 
-    void CalculateDensityAndPressure(Particle particle)
+    void CalculateDensityAndPressure(int index)
     {
         float density = RestDensity;
-        List<Particle> neighbors = _spatialHash.GetNeighbors(particle.transform.position, SmoothingRadius);
+        List<int> neighborIndices = _spatialHash.GetNeighbors(positions[index], SmoothingRadius);
 
-        foreach (Particle neighbour in neighbors)
+        foreach (int neighborIndex in neighborIndices)
         {
-            if (neighbour == particle) continue;
-            float distance = Vector2.Distance(particle.transform.position, neighbour.transform.position);
-            density += neighbour.Mass * KernelFunction(DensityKernel, SmoothingRadius+0.0004f, distance+0.0004f);
-        } 
-        particle.Density = density;
-        particle.Pressure = Stifness * density;
+            if (neighborIndex == index) continue;
+            float distance = Vector2.Distance(positions[index], positions[neighborIndex]);
+            density += _particles[neighborIndex].Mass * KernelFunction(DensityKernel, SmoothingRadius + 0.0004f, distance + 0.0004f);
+        }
+        _particles[index].Density = density;
+        _particles[index].Pressure = Stifness * density;
     }
 
     float KernelFunction(Kernel kernel, float smoothingRadius, float distance)
@@ -124,7 +143,7 @@ public class SimulationController : MonoBehaviour
         switch (DensityKernel)
         {
             case Kernel.Quadratic:
-                return QuadraticKernel.Calculate(smoothingRadius, distance);  
+                return QuadraticKernel.Calculate(smoothingRadius, distance);
             case Kernel.Poly6:
                 return Poly6Kernel.Calculate(smoothingRadius, distance);
             case Kernel.Debrun:
@@ -139,7 +158,7 @@ public class SimulationController : MonoBehaviour
         switch (kernel)
         {
             case Kernel.Quadratic:
-                return QuadraticKernel.Gradient(smoothingRadius, distance);  
+                return QuadraticKernel.Gradient(smoothingRadius, distance);
             case Kernel.Poly6:
                 return Poly6Kernel.Gradient(smoothingRadius, distance);
             case Kernel.Debrun:
@@ -151,51 +170,55 @@ public class SimulationController : MonoBehaviour
 
     float KernelFunctionLaplacian(Kernel kernel, float smoothingRadius, float distance)
     {
-        switch(kernel)
+        switch (kernel)
         {
             case Kernel.Viscosity:
-                return ViscKernel.Laplacian(smoothingRadius, distance);   
+                return ViscKernel.Laplacian(smoothingRadius, distance);
             default:
                 throw new ArgumentException("Not implemented Laplacian for this Density Kernel");
         }
     }
 
-    void UpdatePosition(Particle particle)
+    void UpdatePositionsAndVelocities(int index)
     {
-        if (ChangeParticlesColor) particle.UpdateParticleColor();
-        particle.transform.Translate(particle.Velocity * Time.deltaTime);
-        ResolveBoundariesCollision(particle);
+        if (ChangeParticlesColor) _particles[index].UpdateParticleColor();
+        positions[index] += velocities[index] * deltaTime;
+        ResolveBoundariesCollision(index);
+        _particles[index].Velocity = velocities[index];
+        _particles[index].transform.position = positions[index];
     }
 
-    void ResolveBoundariesCollision(Particle particle)
+    void ResolveBoundariesCollision(int index)
     {
-        Vector3 particlePosition = particle.transform.position;
-        float halfWidth = _particleSpawner.Width / 2f - particle.transform.localScale.x/2;
-        float halfHeight = _particleSpawner.Height / 2f - particle.transform.localScale.x/2;
+        Vector2 particlePosition = positions[index];
+        Vector2 velocity = velocities[index];
+        float halfWidth = _particleSpawner.Width / 2f - _particles[index].transform.localScale.x / 2;
+        float halfHeight = _particleSpawner.Height / 2f - _particles[index].transform.localScale.x / 2;
         Vector3 spawnerCenter = _particleSpawner.transform.position;
 
         if (particlePosition.x > spawnerCenter.x + halfWidth)
         {
             particlePosition.x = spawnerCenter.x + halfWidth;
-            particle.Velocity.x = -particle.Velocity.x;
+            velocity.x = -velocity.x;
         }
         else if (particlePosition.x < spawnerCenter.x - halfWidth)
         {
             particlePosition.x = spawnerCenter.x - halfWidth;
-            particle.Velocity.x = -particle.Velocity.x;
+            velocity.x = -velocity.x;
         }
 
         if (particlePosition.y > spawnerCenter.y + halfHeight)
         {
             particlePosition.y = spawnerCenter.y + halfHeight;
-            particle.Velocity.y = -particle.Velocity.y;
+            velocity.y = -velocity.y;
         }
         else if (particlePosition.y < spawnerCenter.y - halfHeight)
         {
             particlePosition.y = spawnerCenter.y - halfHeight;
-            particle.Velocity.y = -particle.Velocity.y;
+            velocity.y = -velocity.y;
         }
 
-        particle.transform.position = particlePosition;
+        positions[index] = particlePosition;
+        velocities[index] = velocity;
     }
 }

@@ -8,6 +8,7 @@ using UnityEngine;
 
 public class Particle : MonoBehaviour
 {
+    public int Index { get; set; }
     public Vector2 Velocity = Vector2.zero;
     public float Mass;
     public float Density;
