@@ -1,224 +1,98 @@
-using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using UnityEngine;
-
-public enum Kernel
-{
-    Quadratic,
-    Poly6,
-    Debrun,
-    Viscosity
-}
 
 public class SimulationController : MonoBehaviour
 {
-    public bool ChangeParticlesColor = false;
-    public bool ShowSmoothingRadius = false;
-    public float Stifness = 1f; // Ideal gas equation constant
-    public float RestDensity = 0.001f; // helps with numerical stability
-    public float TargetDensity = 0.6f;
+    // Boundary
+    public Vector2 BoundarySize = new Vector2(20, 20);
+    public Vector2 SpawnCenter = new Vector2(5,5);
+    public float SpawnArea = 1f; 
+
+    // External forces
     public float Gravity = -9.8f;
-    public float PressureForceIntensity = 1f;
-    public float SmoothingRadius = 3f;
-    public Kernel DensityKernel;
-    private Kernel ViscosityKernel = Kernel.Viscosity;
 
-    private List<Particle> _particles;
-    private SpatialHash _spatialHash;
 
+    // Fluid
+
+
+
+    // Particles
+    public int NumParticles = 50;
+    /// GameObject to be assigned from editor
     [SerializeField]
-    private GameObject _fluidSpawner;
+    public GameObject ParticleGameObject;
+    /// GameObject array to loop through the particles
+    private GameObject[] _particleGameObject;
+    private Vector2[] _particlePos;
+    private Vector2[] _particleVel;
 
-    private ParticleSpawner _particleSpawner;
-
-    private List<Vector2> positions;
-    private List<Vector2> velocities;
-
-    private float deltaTime;
 
     void Awake()
     {
-        if (_fluidSpawner == null)
-        {
-            throw new Exception("Particle Spawner Object needed to run simulation.");
-        }
-
-        _particleSpawner = _fluidSpawner.GetComponent<ParticleSpawner>();
-        if (_particleSpawner == null)
-        {
-            throw new Exception("ParticleSpawner component not found on SpawnerObject.");
-        }
-        if (ShowSmoothingRadius) _particleSpawner.ParticlesAuraRadius = SmoothingRadius;
-
-        _particles = _particleSpawner.GetParticles();
-        _spatialHash = new SpatialHash(SmoothingRadius);
-
-        // Initialize position and velocity lists
-        positions = new List<Vector2>(_particles.Count);
-        velocities = new List<Vector2>(_particles.Count);
-        foreach (var particle in _particles)
-        {
-            positions.Add(particle.transform.position);
-            velocities.Add(particle.Velocity);
-        }
-        deltaTime = Time.deltaTime;
-
+        _particleGameObject = new GameObject[NumParticles];
+        _particlePos = new Vector2[NumParticles];
+        _particleVel = new Vector2[NumParticles];
     }
 
+    void Start(){
+        SpawnParticles();
+    }
+
+    // Update is called once per frame
     void Update()
     {
-        _spatialHash.Clear();
-
-        for (int i = 0; i < _particles.Count; i++)
-        {
-            _spatialHash.Insert(i, positions[i]);
-        }
-
-        Parallel.For(0, _particles.Count, i =>
-        {
-            CalculateDensityAndPressure(i);
-        });
-
-        Parallel.For(0, _particles.Count, i =>
-        {
-            ApplyGravity(i);
-            ApplyInteractions(i);
-        });
-
-        for (int i = 0; i < _particles.Count; i++)
-        {
-            UpdatePositionsAndVelocities(i);
-        }
-
+        IntegrateParticles();
     }
 
-    void ApplyGravity(int index)
+    void IntegrateParticles(){
+        for (int i = 0; i < NumParticles; i++){
+            _particleVel[i].y += Gravity * Time.deltaTime;
+            _particlePos[i] += _particleVel[i] * Time.deltaTime;
+            HandleBoundaryCollisions(i);
+
+            _particleGameObject[i].transform.position = _particlePos[i];
+        }
+    }
+
+    void HandleBoundaryCollisions(int i)
     {
-        velocities[index] += new Vector2(0, Gravity) * deltaTime;
+        if (_particlePos[i].x <= -BoundarySize.x / 2 || _particlePos[i].x >= BoundarySize.x / 2)
+        {
+            _particleVel[i].x = -0.2f*_particleVel[i].x;
+            // Make sure the particle is within bounds after bounce
+            _particlePos[i].x = Mathf.Clamp(_particlePos[i].x, -BoundarySize.x / 2, BoundarySize.x / 2);
+        }
+        if (_particlePos[i].y <= -BoundarySize.y / 2 || _particlePos[i].y >= BoundarySize.y / 2)
+        {
+            _particleVel[i].y = -0.2f*_particleVel[i].y;
+            // Make sure the particle is within bounds after bounce
+            _particlePos[i].y = Mathf.Clamp(_particlePos[i].y, -BoundarySize.y / 2, BoundarySize.y / 2);
+        }
     }
 
-    void ApplyInteractions(int index)
+    void SpawnParticles()
     {
-        Vector2 pressureForce = Vector2.zero;
-        Vector2 viscosityForce = Vector2.zero;
 
-        List<int> neighborIndices = _spatialHash.GetNeighbors(positions[index], SmoothingRadius);
-
-        foreach (int neighborIndex in neighborIndices)
+        for (int i = 0; i < NumParticles; i++)
         {
-            if (neighborIndex == index) continue;
-
-            float distance = Vector2.Distance(positions[index], positions[neighborIndex]);
-            Vector2 direction = (positions[index] - positions[neighborIndex]).normalized;
-            float gradient = -KernelFunctionGradient(DensityKernel, SmoothingRadius + 0.0004f, distance + 0.0004f);
-            float laplacian = -KernelFunctionLaplacian(ViscosityKernel, SmoothingRadius + 0.0004f, distance + 0.0004f);
-
-            Particle neighbor = _particles[neighborIndex];
-            pressureForce += neighbor.Mass * (neighbor.Pressure) / (2 * neighbor.Density) * gradient * direction;
-            viscosityForce += Vector2.zero; //neighbor.Mass * (neighbor.Velocity - neighbor.Velocity) / neighbor.Density * laplacian;
-        }
-        float diffDensity = TargetDensity >= 0.05 ? Math.Abs(TargetDensity - _particles[index].Density) : 1;
-        velocities[index] += (diffDensity * PressureForceIntensity * pressureForce + viscosityForce) / _particles[index].Density * deltaTime;
-
-    }
-
-    void CalculateDensityAndPressure(int index)
-    {
-        float density = RestDensity;
-        List<int> neighborIndices = _spatialHash.GetNeighbors(positions[index], SmoothingRadius);
-
-        foreach (int neighborIndex in neighborIndices)
-        {
-            if (neighborIndex == index) continue;
-            float distance = Vector2.Distance(positions[index], positions[neighborIndex]);
-            density += _particles[neighborIndex].Mass * KernelFunction(DensityKernel, SmoothingRadius + 0.0004f, distance + 0.0004f);
-        }
-        _particles[index].Density = density;
-        _particles[index].Pressure = Stifness * density;
-    }
-
-    float KernelFunction(Kernel kernel, float smoothingRadius, float distance)
-    {
-        switch (DensityKernel)
-        {
-            case Kernel.Quadratic:
-                return QuadraticKernel.Calculate(smoothingRadius, distance);
-            case Kernel.Poly6:
-                return Poly6Kernel.Calculate(smoothingRadius, distance);
-            case Kernel.Debrun:
-                return DebrunKernel.Calculate(smoothingRadius, distance);
-            default:
-                throw new ArgumentException("Not implemented Density Kernel");
+            Vector2 spawnPosition = SpawnCenter + Random.insideUnitCircle*SpawnArea;
+            GameObject particle = Instantiate(ParticleGameObject, spawnPosition, Quaternion.identity);
+            _particleGameObject[i] = particle;
+            _particlePos[i] = spawnPosition;
+            _particleVel[i] = Vector2.zero;
         }
     }
 
-    float KernelFunctionGradient(Kernel kernel, float smoothingRadius, float distance)
-    {
-        switch (kernel)
-        {
-            case Kernel.Quadratic:
-                return QuadraticKernel.Gradient(smoothingRadius, distance);
-            case Kernel.Poly6:
-                return Poly6Kernel.Gradient(smoothingRadius, distance);
-            case Kernel.Debrun:
-                return DebrunKernel.Gradient(smoothingRadius, distance);
-            default:
-                throw new ArgumentException("Not implemented Gradient for this Density Kernel");
+    void OnDrawGizmos() {
+        Gizmos.color = Color.blue;
+        Gizmos.DrawWireCube(Vector2.zero, BoundarySize);
+
+        if (!Application.isPlaying){
+            Gizmos.color = Color.white;
+            Gizmos.DrawWireSphere(SpawnCenter, SpawnArea);
         }
+
     }
 
-    float KernelFunctionLaplacian(Kernel kernel, float smoothingRadius, float distance)
-    {
-        switch (kernel)
-        {
-            case Kernel.Viscosity:
-                return ViscKernel.Laplacian(smoothingRadius, distance);
-            default:
-                throw new ArgumentException("Not implemented Laplacian for this Density Kernel");
-        }
-    }
-
-    void UpdatePositionsAndVelocities(int index)
-    {
-        if (ChangeParticlesColor) _particles[index].UpdateParticleColor();
-        positions[index] += velocities[index] * deltaTime;
-        ResolveBoundariesCollision(index);
-        _particles[index].Velocity = velocities[index];
-        _particles[index].transform.position = positions[index];
-    }
-
-    void ResolveBoundariesCollision(int index)
-    {
-        Vector2 particlePosition = positions[index];
-        Vector2 velocity = velocities[index];
-        float halfWidth = _particleSpawner.Width / 2f - _particles[index].transform.localScale.x / 2;
-        float halfHeight = _particleSpawner.Height / 2f - _particles[index].transform.localScale.x / 2;
-        Vector3 spawnerCenter = _particleSpawner.transform.position;
-
-        if (particlePosition.x > spawnerCenter.x + halfWidth)
-        {
-            particlePosition.x = spawnerCenter.x + halfWidth;
-            velocity.x = -velocity.x;
-        }
-        else if (particlePosition.x < spawnerCenter.x - halfWidth)
-        {
-            particlePosition.x = spawnerCenter.x - halfWidth;
-            velocity.x = -velocity.x;
-        }
-
-        if (particlePosition.y > spawnerCenter.y + halfHeight)
-        {
-            particlePosition.y = spawnerCenter.y + halfHeight;
-            velocity.y = -velocity.y;
-        }
-        else if (particlePosition.y < spawnerCenter.y - halfHeight)
-        {
-            particlePosition.y = spawnerCenter.y - halfHeight;
-            velocity.y = -velocity.y;
-        }
-
-        positions[index] = particlePosition;
-        velocities[index] = velocity;
-    }
 }
