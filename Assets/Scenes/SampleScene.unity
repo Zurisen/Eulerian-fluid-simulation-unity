@@ -245,9 +245,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   BoundarySize: {x: 20, y: 20}
   SpawnCenter: {x: 0, y: 0}
-  SpawnArea: 3.04
+  SpawnArea: 3
   Gravity: -9.8
-  NumParticles: 50
+  CellSize: 1
+  NumParticles: 300
+  PushIterations: 3
   ParticleGameObject: {fileID: 656765185979230010, guid: 088ee36f1afed5999a86efaa31314527, type: 3}
 --- !u!4 &872552904
 Transform:
