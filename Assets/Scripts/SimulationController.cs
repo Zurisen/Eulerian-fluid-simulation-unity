@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Xml.XPath;
+using Unity.VisualScripting;
 using UnityEditor.U2D.Aseprite;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -38,6 +39,9 @@ public class SimulationController : MonoBehaviour
     public int NumParticles = 50;
     /// GameObject to be assigned from editor
     public int PushIterations = 3;
+    public Kernel DensityKernel;
+    public float DensityStifness = 1;
+    public float PressureRelaxation = 1;
     [SerializeField]
     public GameObject ParticleGameObject;
     /// GameObject array to loop through the particles
@@ -45,6 +49,8 @@ public class SimulationController : MonoBehaviour
     private GameObject[] _particleGameObject;
     private Vector2[] _particlePos;
     private Vector2[] _particleVel;
+    private float[] _particleDens;
+    private Vector2[] _particlePress;
     private int[] _cellParticlesIds;
 
     void Awake()
@@ -68,6 +74,8 @@ public class SimulationController : MonoBehaviour
         _particleGameObject = new GameObject[NumParticles];
         _particlePos = new Vector2[NumParticles];
         _particleVel = new Vector2[NumParticles];
+        _particleDens = new float[NumParticles];
+        _particlePress = new Vector2[NumParticles];
         _cellParticlesIds = new int[NumParticles];
     }
 
@@ -126,6 +134,12 @@ public class SimulationController : MonoBehaviour
 
         // Step 4: push particles apart
         for (int iter = 0; iter < PushIterations; iter++){
+            if (iter % 2 == 0) {
+                Array.Clear(_particleDens, 0, _particleDens.Length);
+            } else {
+                Array.Clear(_particlePress, 0, _particlePress.Length);
+            }
+
             for (int i = 0; i < NumParticles; i++){
                 Vector2 pos = _particlePos[i];
                 int pxi = Mathf.FloorToInt(pos.x/h);
@@ -135,6 +149,7 @@ public class SimulationController : MonoBehaviour
                 int x1 = Math.Clamp(pxi+1, 0, numCellsX-1);
                 int y0 = Math.Clamp(pyi-1, 0, numCellsX-1);
                 int y1 = Math.Clamp(pyi+1, 0, numCellsX-1);
+
 
                 for (int xi = x0; xi <= x1; xi++)
                 {
@@ -154,6 +169,14 @@ public class SimulationController : MonoBehaviour
                             if (dist2 > minDist2 || dist2 == 0.0f) continue;
 
                             float dist = Mathf.Sqrt(dist2);
+                            if (iter % 2 == 0){
+                                _particleDens[i] += calculateDensity(dist);
+                            } else {
+                                _particlePress[i] += calculatePressure(i, id, dist);
+                                if (_particleDens[i] != 0.0f) 
+                                    _particleVel[i] += PressureRelaxation*(_particlePress[i]/_particleDens[i]) *Time.deltaTime;
+                            }
+
                             float s = 0.5f * (minDist -  dist)/dist;
                             Vector2 displacement = diff * s;
                             _particlePos[i] -= displacement;
@@ -176,6 +199,49 @@ public class SimulationController : MonoBehaviour
             return cellNr;       
     }
 
+    private float calculateDensity(float distance){
+        float density = DensityStifness * KernelFunction(DensityKernel, h, distance); // we assume particle mass = 1
+        return density;
+    }
+
+    private Vector2 calculatePressure(int particleId, int neighborId, float distance){
+        if (_particleDens[neighborId] == 0.0) return Vector2.zero;
+
+        Vector2 direction = (_particlePos[particleId] - _particlePos[neighborId]).normalized;
+        float gradient  = -KernelFunctionGradient(DensityKernel, h, distance);
+        Vector2 pressure = (_particleDens[particleId] + _particleDens[neighborId])/(2*_particleDens[neighborId]) *gradient *direction;
+        return pressure;
+    }
+
+
+    float KernelFunction(Kernel kernel, float smoothingRadius, float distance)
+    {
+        switch (DensityKernel)
+        {
+            case Kernel.Quadratic:
+                return QuadraticKernel.Calculate(smoothingRadius, distance);  
+            case Kernel.Poly6:
+                return Poly6Kernel.Calculate(smoothingRadius, distance);
+            case Kernel.Debrun:
+                return DebrunKernel.Calculate(smoothingRadius, distance);
+            default:
+                throw new ArgumentException("Not implemented Density Kernel");
+        }
+
+    }
+    float KernelFunctionGradient(Kernel kernel, float smoothingRadius, float distance){
+        switch (kernel)
+        {
+            case Kernel.Quadratic:
+                return QuadraticKernel.Gradient(smoothingRadius, distance);  
+            case Kernel.Poly6:
+                return Poly6Kernel.Gradient(smoothingRadius, distance);
+            case Kernel.Debrun:
+                return DebrunKernel.Gradient(smoothingRadius, distance);
+            default:
+                throw new ArgumentException("Not implemented Gradient for this Density Kernel");
+        }
+    }
 
     void HandleBoundaryCollisions(int i)
     {
@@ -398,4 +464,12 @@ public enum CellType{
     Solid,
     Fluid,
     Air
+}
+
+
+public enum Kernel
+{
+    Quadratic,
+    Poly6,
+    Debrun,
 }

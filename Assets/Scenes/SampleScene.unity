@@ -248,8 +248,11 @@ MonoBehaviour:
   SpawnArea: 3
   Gravity: -9.8
   CellSize: 1
-  NumParticles: 300
+  NumParticles: 1000
   PushIterations: 3
+  DensityKernel: 2
+  DensityStifness: 1
+  PressureRelaxation: 0.5
   ParticleGameObject: {fileID: 656765185979230010, guid: 088ee36f1afed5999a86efaa31314527, type: 3}
 --- !u!4 &872552904
 Transform:

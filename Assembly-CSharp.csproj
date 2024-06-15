@@ -65,6 +65,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets/Scripts/SimulationController.cs" />
+    <Compile Include="Assets/Scripts/Kernels.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets/Shaders/SmoothingRadiusShader.shader" />
