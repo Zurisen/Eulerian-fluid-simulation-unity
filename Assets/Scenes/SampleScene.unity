@@ -245,14 +245,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   BoundarySize: {x: 20, y: 20}
   SpawnCenter: {x: 0, y: 0}
-  SpawnArea: 3
+  SpawnArea: 6
   Gravity: -9.8
-  CellSize: 1
-  NumParticles: 1000
-  PushIterations: 3
-  DensityKernel: 2
+  CellSize: 0.3
+  NumParticles: 100
+  PushIterations: 2
+  PressureIterations: 30
+  Density: 1000
+  DensityKernel: 0
+  TargetDensity: 2
   DensityStifness: 1
-  PressureRelaxation: 0.5
+  PressureRelaxation: 0.1
+  OverRelaxation: 1.9
+  FLIPRatio: 0.9
   ParticleGameObject: {fileID: 656765185979230010, guid: 088ee36f1afed5999a86efaa31314527, type: 3}
 --- !u!4 &872552904
 Transform:

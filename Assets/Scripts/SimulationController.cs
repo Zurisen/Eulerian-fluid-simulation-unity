@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using System.Xml.Schema;
 using System.Xml.XPath;
 using Unity.VisualScripting;
 using UnityEditor.U2D.Aseprite;
@@ -39,9 +41,12 @@ public class SimulationController : MonoBehaviour
     public int NumParticles = 50;
     /// GameObject to be assigned from editor
     public int PushIterations = 3;
-    public Kernel DensityKernel;
+    public int PressureIterations = 100;
+    public float Density = 1000;
     public float DensityStifness = 1;
     public float PressureRelaxation = 1;
+    public float OverRelaxation = 1.9f;
+    public float FLIPRatio = 1;
     [SerializeField]
     public GameObject ParticleGameObject;
     /// GameObject array to loop through the particles
@@ -49,8 +54,6 @@ public class SimulationController : MonoBehaviour
     private GameObject[] _particleGameObject;
     private Vector2[] _particlePos;
     private Vector2[] _particleVel;
-    private float[] _particleDens;
-    private Vector2[] _particlePress;
     private int[] _cellParticlesIds;
 
     void Awake()
@@ -74,8 +77,6 @@ public class SimulationController : MonoBehaviour
         _particleGameObject = new GameObject[NumParticles];
         _particlePos = new Vector2[NumParticles];
         _particleVel = new Vector2[NumParticles];
-        _particleDens = new float[NumParticles];
-        _particlePress = new Vector2[NumParticles];
         _cellParticlesIds = new int[NumParticles];
     }
 
@@ -88,8 +89,9 @@ public class SimulationController : MonoBehaviour
     {
         IntegrateParticles();
         PushParticlesApart();
-        //TransferVelocities(true);
-        //TransferVelocities(false, FLIPRatio: 0.9f);
+        TransferVelocities(true);
+        SolveIncompressibility(PressureIterations, OverRelaxation);
+        TransferVelocities(false, FLIPRatio: Math.Clamp(FLIPRatio, 0, 1));
     }
 
 
@@ -134,11 +136,6 @@ public class SimulationController : MonoBehaviour
 
         // Step 4: push particles apart
         for (int iter = 0; iter < PushIterations; iter++){
-            if (iter % 2 == 0) {
-                Array.Clear(_particleDens, 0, _particleDens.Length);
-            } else {
-                Array.Clear(_particlePress, 0, _particlePress.Length);
-            }
 
             for (int i = 0; i < NumParticles; i++){
                 Vector2 pos = _particlePos[i];
@@ -169,15 +166,8 @@ public class SimulationController : MonoBehaviour
                             if (dist2 > minDist2 || dist2 == 0.0f) continue;
 
                             float dist = Mathf.Sqrt(dist2);
-                            if (iter % 2 == 0){
-                                _particleDens[i] += calculateDensity(dist);
-                            } else {
-                                _particlePress[i] += calculatePressure(i, id, dist);
-                                if (_particleDens[i] != 0.0f) 
-                                    _particleVel[i] += PressureRelaxation*(_particlePress[i]/_particleDens[i]) *Time.deltaTime;
-                            }
 
-                            float s = 0.5f * (minDist -  dist)/dist;
+                            float s = (minDist -  dist)/dist;
                             Vector2 displacement = diff * s;
                             _particlePos[i] -= displacement;
                             _particlePos[id] += displacement;
@@ -199,49 +189,6 @@ public class SimulationController : MonoBehaviour
             return cellNr;       
     }
 
-    private float calculateDensity(float distance){
-        float density = DensityStifness * KernelFunction(DensityKernel, h, distance); // we assume particle mass = 1
-        return density;
-    }
-
-    private Vector2 calculatePressure(int particleId, int neighborId, float distance){
-        if (_particleDens[neighborId] == 0.0) return Vector2.zero;
-
-        Vector2 direction = (_particlePos[particleId] - _particlePos[neighborId]).normalized;
-        float gradient  = -KernelFunctionGradient(DensityKernel, h, distance);
-        Vector2 pressure = (_particleDens[particleId] + _particleDens[neighborId])/(2*_particleDens[neighborId]) *gradient *direction;
-        return pressure;
-    }
-
-
-    float KernelFunction(Kernel kernel, float smoothingRadius, float distance)
-    {
-        switch (DensityKernel)
-        {
-            case Kernel.Quadratic:
-                return QuadraticKernel.Calculate(smoothingRadius, distance);  
-            case Kernel.Poly6:
-                return Poly6Kernel.Calculate(smoothingRadius, distance);
-            case Kernel.Debrun:
-                return DebrunKernel.Calculate(smoothingRadius, distance);
-            default:
-                throw new ArgumentException("Not implemented Density Kernel");
-        }
-
-    }
-    float KernelFunctionGradient(Kernel kernel, float smoothingRadius, float distance){
-        switch (kernel)
-        {
-            case Kernel.Quadratic:
-                return QuadraticKernel.Gradient(smoothingRadius, distance);  
-            case Kernel.Poly6:
-                return Poly6Kernel.Gradient(smoothingRadius, distance);
-            case Kernel.Debrun:
-                return DebrunKernel.Gradient(smoothingRadius, distance);
-            default:
-                throw new ArgumentException("Not implemented Gradient for this Density Kernel");
-        }
-    }
 
     void HandleBoundaryCollisions(int i)
     {
@@ -259,11 +206,11 @@ public class SimulationController : MonoBehaviour
         }
     }
 
+
     void TransferVelocities(bool toGrid, float FLIPRatio = 0.1f) {
         var h2 = h / 2;
 
         if (toGrid) {
-
             // Initialize cell types to air
             for (int i = 0; i < numCells; i++) {
                 cellTypes[i] = CellType.Air;
@@ -288,8 +235,8 @@ public class SimulationController : MonoBehaviour
             // Transfer particle velocities to grid
             for (int i = 0; i < NumParticles; i++) {
                 var pos = _particlePos[i];
-                int Xc = Mathf.Min(Math.Max(Mathf.FloorToInt((pos.x + BoundarySize.x / 2 - h2) / h), 0), numCellsX - 2);
-                int Yc = Mathf.Min(Math.Max(Mathf.FloorToInt((pos.y + BoundarySize.y / 2 - h2) / h), 0), numCellsY - 2);
+                int Xc = Mathf.Clamp((int)((pos.x + BoundarySize.x / 2) / h), 0, numCellsX - 1);
+                int Yc = Mathf.Clamp((int)((pos.y + BoundarySize.y / 2) / h), 0, numCellsY - 1);
 
                 float deltaX = (pos.x + BoundarySize.x / 2) - Xc * h;
                 float deltaY = (pos.y + BoundarySize.y / 2) - Yc * h;
@@ -299,10 +246,10 @@ public class SimulationController : MonoBehaviour
                 float w2 = (1 - deltaX / h) * (deltaY / h);
                 float w3 = (deltaX / h) * (deltaY / h);
 
-                int cellNr0 = Xc * numCellsY + Yc;
-                int cellNr1 = (Xc + 1) * numCellsY + Yc;
-                int cellNr2 = Xc * numCellsY + (Yc + 1);
-                int cellNr3 = (Xc + 1) * numCellsY + (Yc + 1);
+                int cellNr0 = getCellNrFromCoord(Xc, Yc);
+                int cellNr1 = getCellNrFromCoord(Xc + 1, Yc);
+                int cellNr2 = getCellNrFromCoord(Xc, Yc + 1);
+                int cellNr3 = getCellNrFromCoord(Xc + 1, Yc + 1);
 
                 _cellVel[cellNr0] += _particleVel[i] * w0;
                 _cellVel[cellNr1] += _particleVel[i] * w1;
@@ -324,8 +271,8 @@ public class SimulationController : MonoBehaviour
             // Transfer grid velocities to particles
             for (int i = 0; i < NumParticles; i++) {
                 var pos = _particlePos[i];
-                int Xc = Mathf.Min(Math.Max(Mathf.FloorToInt((pos.x + BoundarySize.x / 2 - h2) / h), 0), numCellsX - 2);
-                int Yc = Mathf.Min(Math.Max(Mathf.FloorToInt((pos.y + BoundarySize.y / 2 - h2) / h), 0), numCellsY - 2);
+                int Xc = Mathf.Clamp((int)((pos.x + BoundarySize.x / 2) / h), 0, numCellsX - 1);
+                int Yc = Mathf.Clamp((int)((pos.y + BoundarySize.y / 2) / h), 0, numCellsY - 1);
 
                 float deltaX = (pos.x + BoundarySize.x / 2) - Xc * h;
                 float deltaY = (pos.y + BoundarySize.y / 2) - Yc * h;
@@ -335,27 +282,43 @@ public class SimulationController : MonoBehaviour
                 float w2 = (1 - deltaX / h) * (deltaY / h);
                 float w3 = (deltaX / h) * (deltaY / h);
 
-                int cellNr0 = Xc * numCellsY + Yc;
-                int cellNr1 = (Xc + 1) * numCellsY + Yc;
-                int cellNr2 = Xc * numCellsY + (Yc + 1);
-                int cellNr3 = (Xc + 1) * numCellsY + (Yc + 1);
+                int cellNr0 = getCellNrFromCoord(Xc, Yc);
+                int cellNr1 = getCellNrFromCoord(Xc + 1, Yc);
+                int cellNr2 = getCellNrFromCoord(Xc, Yc + 1);
+                int cellNr3 = getCellNrFromCoord(Xc + 1, Yc + 1);
 
-                Vector2 picVel = _cellVel[cellNr0] * w0 + _cellVel[cellNr1] * w1 + _cellVel[cellNr2] * w2 + _cellVel[cellNr3] * w3;
-                Vector2 flipVel = _particleVel[i] + (_cellVel[cellNr0] - _cellPrevVel[cellNr0]) * w0 +
-                                    (_cellVel[cellNr1] - _cellPrevVel[cellNr1]) * w1 +
-                                    (_cellVel[cellNr2] - _cellPrevVel[cellNr2]) * w2 +
-                                    (_cellVel[cellNr3] - _cellPrevVel[cellNr3]) * w3;  
+                Vector2 isValidNr0 = checkIfCellIsValid(Xc, Yc);
+                Vector2 isValidNr1 = checkIfCellIsValid(Xc + 1, Yc);
+                Vector2 isValidNr2 = checkIfCellIsValid(Xc, Yc + 1);
+                Vector2 isValidNr3 = checkIfCellIsValid(Xc + 1, Yc + 1);
+
+                Vector2 picVel = isValidNr0 * _cellVel[cellNr0] * w0 + isValidNr1 * _cellVel[cellNr1] * w1 + isValidNr2 * _cellVel[cellNr2] * w2 + isValidNr3 * _cellVel[cellNr3] * w3;
+                Vector2 flipVel = _particleVel[i] + 
+                                    isValidNr0 * (_cellVel[cellNr0] - _cellPrevVel[cellNr0]) * w0 +
+                                    isValidNr1 * (_cellVel[cellNr1] - _cellPrevVel[cellNr1]) * w1 +
+                                    isValidNr2 * (_cellVel[cellNr2] - _cellPrevVel[cellNr2]) * w2 +
+                                    isValidNr3 * (_cellVel[cellNr3] - _cellPrevVel[cellNr3]) * w3;
 
                 _particleVel[i] = FLIPRatio * flipVel + (1 - FLIPRatio) * picVel;
-
             }
         }
     }
 
+    private int getCellNrFromCoord(int i, int j) {
+        return Math.Clamp(i * numCellsY + j, 0, numCells - 1);
+    }
+
+    private Vector2 checkIfCellIsValid(int xc, int yc) {
+        if (xc < 0 || yc < 0 || xc >= numCellsX || yc >= numCellsY) return Vector2.zero;
+        int cellNr = getCellNrFromCoord(xc, yc);
+        return cellTypes[cellNr] == CellType.Air ? Vector2.zero : Vector2.one;
+    }
+
+
     void SolveIncompressibility(int numIters, float overRelaxation)
     {
         int n = numCellsY;
-        float cp = h / Time.deltaTime;  // Assuming density is 1 for simplicity, adjust if needed
+        float cp = Density * h / Time.deltaTime;  // Assuming density is 1 for simplicity, adjust if needed
 
         // Initialize pressure
         Array.Clear(p, 0, p.Length);
@@ -394,19 +357,6 @@ public class SimulationController : MonoBehaviour
             }
         }
 
-        // Correct velocities
-        for (int i = 1; i < numCellsX - 1; i++)
-        {
-            for (int j = 1; j < numCellsY - 1; j++)
-            {
-                int center = i * n + j;
-                if (cellTypes[center] == CellType.Fluid)
-                {
-                    _cellVel[center].x -= (p[center + n] - p[center])/h;
-                    _cellVel[center].y -= (p[center + 1] - p[center])/h;
-                }
-            }
-        }
     }
 
 
@@ -447,7 +397,7 @@ public class SimulationController : MonoBehaviour
                     // Calculate color based on velocity magnitude
                     float velocityMagnitude = _cellVel[cellIndex].magnitude;
                     Color cellColor = Color.Lerp(Color.blue, Color.red, velocityMagnitude / 10f);
-                    Gizmos.color = cellColor;
+                    Gizmos.color = cellColor.WithAlpha(0.4f);
 
                     // Draw the cell
                     Gizmos.DrawCube(cellPos, new Vector3(h, h, 0));
@@ -466,10 +416,3 @@ public enum CellType{
     Air
 }
 
-
-public enum Kernel
-{
-    Quadratic,
-    Poly6,
-    Debrun,
-}
