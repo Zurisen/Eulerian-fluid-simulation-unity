@@ -247,16 +247,13 @@ MonoBehaviour:
   SpawnCenter: {x: 0, y: 0}
   SpawnArea: 6
   Gravity: -9.8
-  CellSize: 0.3
-  NumParticles: 100
+  CellSize: 0.4
+  NumParticles: 2000
   PushIterations: 2
-  PressureIterations: 30
+  PressureIterations: 50
   Density: 1000
-  DensityKernel: 0
-  TargetDensity: 2
   DensityStifness: 1
-  PressureRelaxation: 0.1
-  OverRelaxation: 1.9
+  OverRelaxation: 1.3
   FLIPRatio: 0.9
   ParticleGameObject: {fileID: 656765185979230010, guid: 088ee36f1afed5999a86efaa31314527, type: 3}
 --- !u!4 &872552904

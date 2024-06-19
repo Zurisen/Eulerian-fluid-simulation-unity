@@ -5,6 +5,7 @@ using System.Linq;
 using System.Xml.Schema;
 using System.Xml.XPath;
 using Unity.VisualScripting;
+using UnityEditor;
 using UnityEditor.U2D.Aseprite;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -43,8 +44,8 @@ public class SimulationController : MonoBehaviour
     public int PushIterations = 3;
     public int PressureIterations = 100;
     public float Density = 1000;
+    public float GtoPRelaxation = 1;
     public float DensityStifness = 1;
-    public float PressureRelaxation = 1;
     public float OverRelaxation = 1.9f;
     public float FLIPRatio = 1;
     [SerializeField]
@@ -82,6 +83,7 @@ public class SimulationController : MonoBehaviour
 
     void Start(){
         SpawnParticles();
+        PushParticlesApart();
     }
 
     // Update is called once per frame
@@ -292,14 +294,19 @@ public class SimulationController : MonoBehaviour
                 Vector2 isValidNr2 = checkIfCellIsValid(Xc, Yc + 1);
                 Vector2 isValidNr3 = checkIfCellIsValid(Xc + 1, Yc + 1);
 
-                Vector2 picVel = isValidNr0 * _cellVel[cellNr0] * w0 + isValidNr1 * _cellVel[cellNr1] * w1 + isValidNr2 * _cellVel[cellNr2] * w2 + isValidNr3 * _cellVel[cellNr3] * w3;
-                Vector2 flipVel = _particleVel[i] + 
-                                    isValidNr0 * (_cellVel[cellNr0] - _cellPrevVel[cellNr0]) * w0 +
-                                    isValidNr1 * (_cellVel[cellNr1] - _cellPrevVel[cellNr1]) * w1 +
-                                    isValidNr2 * (_cellVel[cellNr2] - _cellPrevVel[cellNr2]) * w2 +
-                                    isValidNr3 * (_cellVel[cellNr3] - _cellPrevVel[cellNr3]) * w3;
+                float denominator = isValidNr0.x*w0 + isValidNr1.x*w1 + isValidNr2.x*w2 + isValidNr3.x*w3;
 
-                _particleVel[i] = FLIPRatio * flipVel + (1 - FLIPRatio) * picVel;
+                if (denominator > 0) {
+                    denominator *= GtoPRelaxation;
+                    Vector2 picVel = (isValidNr0 * _cellVel[cellNr0] * w0 + isValidNr1 * _cellVel[cellNr1] * w1 + isValidNr2 * _cellVel[cellNr2] * w2 + isValidNr3 * _cellVel[cellNr3] * w3)/denominator;
+                    Vector2 flipVel = _particleVel[i] + 
+                                        (isValidNr0 * (_cellVel[cellNr0] - _cellPrevVel[cellNr0]) * w0 +
+                                        isValidNr1 * (_cellVel[cellNr1] - _cellPrevVel[cellNr1]) * w1 +
+                                        isValidNr2 * (_cellVel[cellNr2] - _cellPrevVel[cellNr2]) * w2 +
+                                        isValidNr3 * (_cellVel[cellNr3] - _cellPrevVel[cellNr3]) * w3)/denominator;
+
+                    _particleVel[i] = FLIPRatio * flipVel + (1 - FLIPRatio) * picVel;
+                }
             }
         }
     }
@@ -308,10 +315,14 @@ public class SimulationController : MonoBehaviour
         return Math.Clamp(i * numCellsY + j, 0, numCells - 1);
     }
 
-    private Vector2 checkIfCellIsValid(int xc, int yc) {
+    private Vector2 checkIfCellIsValid(int xc, int yc, bool isAirValid=false) {
         if (xc < 0 || yc < 0 || xc >= numCellsX || yc >= numCellsY) return Vector2.zero;
         int cellNr = getCellNrFromCoord(xc, yc);
-        return cellTypes[cellNr] == CellType.Air ? Vector2.zero : Vector2.one;
+        if (isAirValid){
+            return Vector2.one;
+        } else {
+            return cellTypes[cellNr] == CellType.Air ? Vector2.zero : Vector2.one;
+        }
     }
 
 
@@ -342,17 +353,26 @@ public class SimulationController : MonoBehaviour
                     int bottom = i * n + (j - 1);
                     int top = i * n + (j + 1);
 
+                    float isValidLeft = checkIfCellIsValid(i-1, j, isAirValid:true).x;
+                    float isValidRight = checkIfCellIsValid(i+1, j, isAirValid:true).x;
+                    float isValidTop = checkIfCellIsValid(i, j+1, isAirValid:true).y;
+                    float isValidBot = checkIfCellIsValid(i, j-1, isAirValid:true).y;
 
-                    float div = _cellVel[right].x - _cellVel[center].x + _cellVel[top].y - _cellVel[center].y;
+                    float div = isValidRight*_cellVel[right].x - isValidLeft*_cellVel[center].x + isValidTop*_cellVel[top].y - isValidBot*_cellVel[center].y;
+                    float denominator = isValidLeft+isValidRight+isValidTop+isValidBot;
 
-                    float newPressure = -div / 4;
-                    newPressure *= overRelaxation;
-                    p[center] += cp * newPressure;
+                    if (denominator > 0){
+                        float newPressure = -div / denominator;
 
-                    _cellVel[center].x -= newPressure;
-                    _cellVel[right].x += newPressure;
-                    _cellVel[center].y -= newPressure;
-                    _cellVel[top].y += newPressure;
+                        newPressure *= overRelaxation;
+                        p[center] += cp * newPressure;
+
+                        _cellVel[center].x -= newPressure;
+                        _cellVel[right].x += newPressure;
+                        _cellVel[center].y -= newPressure;
+                        _cellVel[top].y += newPressure;
+                    }
+
                 }
             }
         }
@@ -398,9 +418,16 @@ public class SimulationController : MonoBehaviour
                     float velocityMagnitude = _cellVel[cellIndex].magnitude;
                     Color cellColor = Color.Lerp(Color.blue, Color.red, velocityMagnitude / 10f);
                     Gizmos.color = cellColor.WithAlpha(0.4f);
-
                     // Draw the cell
                     Gizmos.DrawCube(cellPos, new Vector3(h, h, 0));
+                    
+                    // Draw velocity text
+                    //Handles.color = Color.white;
+                    GUIStyle style = new GUIStyle();
+                    style.fontSize = 11;
+                    style.normal.textColor = Color.white;
+                    Handles.Label(cellPos, ((int)velocityMagnitude).ToString(), style);
+
                 }
             }
         }
