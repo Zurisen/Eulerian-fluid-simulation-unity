@@ -247,11 +247,12 @@ MonoBehaviour:
   SpawnCenter: {x: 0, y: 0}
   SpawnArea: 6
   Gravity: -9.8
-  CellSize: 0.4
+  CellSize: 0.6
   NumParticles: 2000
   PushIterations: 2
   PressureIterations: 50
   Density: 1000
+  GtoPRelaxation: 1.4
   DensityStifness: 1
   OverRelaxation: 1.3
   FLIPRatio: 0.9

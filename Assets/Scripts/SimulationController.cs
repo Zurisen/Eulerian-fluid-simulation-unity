@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Schema;
 using System.Xml.XPath;
+using Unity.Collections;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEditor.U2D.Aseprite;
@@ -194,17 +195,30 @@ public class SimulationController : MonoBehaviour
 
     void HandleBoundaryCollisions(int i)
     {
-        if (_particlePos[i].x <= -BoundarySize.x / 2 || _particlePos[i].x >= BoundarySize.x / 2)
+        if (_particlePos[i].x >= BoundarySize.x / 2)
         {
             _particleVel[i].x = 0.0f; //-0.2f*_particleVel[i].x;
             // Make sure the particle is within bounds after bounce
-            _particlePos[i].x = Mathf.Clamp(_particlePos[i].x, -BoundarySize.x / 2, BoundarySize.x / 2);
+            _particlePos[i].x = BoundarySize.x / 2;
         }
-        if (_particlePos[i].y <= -BoundarySize.y / 2 || _particlePos[i].y >= BoundarySize.y / 2)
+
+        if (_particlePos[i].x <= -BoundarySize.x/2){
+            _particleVel[i].x = 0.0f; //-0.2f*_particleVel[i].x;
+            _particlePos[i].x = -BoundarySize.x / 2;
+        }
+
+        if (_particlePos[i].y >= BoundarySize.y / 2)
         {
             _particleVel[i].y = 0.0f; //-0.2f*_particleVel[i].y;
             // Make sure the particle is within bounds after bounce
-            _particlePos[i].y = Mathf.Clamp(_particlePos[i].y, -BoundarySize.y / 2, BoundarySize.y / 2);
+            _particlePos[i].y = BoundarySize.y / 2;
+        }
+
+        if (_particlePos[i].y <= -BoundarySize.y / 2)
+        {
+            _particleVel[i].y = 0.0f; //-0.2f*_particleVel[i].y;
+            // Make sure the particle is within bounds after bounce
+            _particlePos[i].y = -BoundarySize.y / 2;
         }
     }
 
@@ -237,11 +251,12 @@ public class SimulationController : MonoBehaviour
             // Transfer particle velocities to grid
             for (int i = 0; i < NumParticles; i++) {
                 var pos = _particlePos[i];
-                int Xc = Mathf.Clamp((int)((pos.x + BoundarySize.x / 2) / h), 0, numCellsX - 1);
-                int Yc = Mathf.Clamp((int)((pos.y + BoundarySize.y / 2) / h), 0, numCellsY - 1);
+                int Xc = Mathf.Clamp((int)Math.Floor((pos.x + BoundarySize.x / 2) / h), 0, numCellsX - 1);
+                int Yc = Mathf.Clamp((int)Math.Floor((pos.y + BoundarySize.y / 2) / h), 0, numCellsY - 1);
 
-                float deltaX = (pos.x + BoundarySize.x / 2) - Xc * h;
-                float deltaY = (pos.y + BoundarySize.y / 2) - Yc * h;
+
+                float deltaX = Math.Clamp(Math.Abs((pos.x+BoundarySize.x/2) - Xc*h), 0, 0.98f);
+                float deltaY = Math.Clamp(Math.Abs((pos.y+BoundarySize.y/2) - Yc*h), 0, 0.98f);
 
                 float w0 = (1 - deltaX / h) * (1 - deltaY / h);
                 float w1 = (deltaX / h) * (1 - deltaY / h);
@@ -273,11 +288,11 @@ public class SimulationController : MonoBehaviour
             // Transfer grid velocities to particles
             for (int i = 0; i < NumParticles; i++) {
                 var pos = _particlePos[i];
-                int Xc = Mathf.Clamp((int)((pos.x + BoundarySize.x / 2) / h), 0, numCellsX - 1);
-                int Yc = Mathf.Clamp((int)((pos.y + BoundarySize.y / 2) / h), 0, numCellsY - 1);
+                int Xc = Mathf.Clamp((int)Math.Floor((pos.x + BoundarySize.x / 2) / h), 0, numCellsX - 1);
+                int Yc = Mathf.Clamp((int)Math.Floor((pos.y + BoundarySize.y / 2) / h), 0, numCellsY - 1);
 
-                float deltaX = (pos.x + BoundarySize.x / 2) - Xc * h;
-                float deltaY = (pos.y + BoundarySize.y / 2) - Yc * h;
+                float deltaX = Math.Clamp(Math.Abs((pos.x+BoundarySize.x/2) - Xc*h), 0, 0.98f);
+                float deltaY = Math.Clamp(Math.Abs((pos.y+BoundarySize.y/2) - Yc*h), 0, 0.98f);
 
                 float w0 = (1 - deltaX / h) * (1 - deltaY / h);
                 float w1 = (deltaX / h) * (1 - deltaY / h);
@@ -305,7 +320,14 @@ public class SimulationController : MonoBehaviour
                                         isValidNr2 * (_cellVel[cellNr2] - _cellPrevVel[cellNr2]) * w2 +
                                         isValidNr3 * (_cellVel[cellNr3] - _cellPrevVel[cellNr3]) * w3)/denominator;
 
+                    var prevVel = _particleVel[i];
                     _particleVel[i] = FLIPRatio * flipVel + (1 - FLIPRatio) * picVel;
+
+                    if (_particleVel[i].y > 20){
+                        print((w0,w1,w2,w3, deltaX/h ,deltaY/h));
+                        print((_particleVel[i].y, prevVel.y, _cellVel[cellNr0].y, _cellVel[cellNr1].y, _cellVel[cellNr2].y, _cellVel[cellNr3].y));
+                        throw new Exception(); 
+                    }
                 }
             }
         }
@@ -428,7 +450,24 @@ public class SimulationController : MonoBehaviour
                     style.normal.textColor = Color.white;
                     Handles.Label(cellPos, ((int)velocityMagnitude).ToString(), style);
 
+                    // Draw velocity vector
+                    // Vector2 velocity = _cellVel[cellIndex].normalized/3;
+                    // Vector3 endPos = new Vector3(cellPos.x + velocity.x, cellPos.y + velocity.y, 0);
+                    // Gizmos.color = Color.white;
+                    // DrawArrow(new Vector3(cellPos.x, cellPos.y, 0), endPos);
+
                 }
+            }
+
+            void DrawArrow(Vector3 start, Vector3 end) {
+                Gizmos.DrawLine(start, end);
+                
+                Vector3 direction = (end - start).normalized;
+                Vector3 right = Quaternion.LookRotation(direction) * Quaternion.Euler(0, 180 + 20, 0) * new Vector3(0, 0, 1);
+                Vector3 left = Quaternion.LookRotation(direction) * Quaternion.Euler(0, 180 - 20, 0) * new Vector3(0, 0, 1);
+
+                Gizmos.DrawLine(end, end + right * 0.1f);
+                Gizmos.DrawLine(end, end + left * 0.1f);
             }
         }
     }
