@@ -246,17 +246,12 @@ MonoBehaviour:
   BoundarySize: {x: 20, y: 20}
   SpawnCenter: {x: 0, y: 0}
   SpawnArea: 6
-  Gravity: -9.8
-  CellSize: 0.6
-  NumParticles: 2000
-  PushIterations: 2
-  PressureIterations: 50
+  Gravity: 0
+  CellSize: 0.3
   Density: 1000
-  GtoPRelaxation: 1.4
-  DensityStifness: 1
+  GSIters: 30
   OverRelaxation: 1.3
-  FLIPRatio: 0.9
-  ParticleGameObject: {fileID: 656765185979230010, guid: 088ee36f1afed5999a86efaa31314527, type: 3}
+  VorticityConfinement: 1
 --- !u!4 &872552904
 Transform:
   m_ObjectHideFlags: 0

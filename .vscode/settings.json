@@ -56,5 +56,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "Fluid Simulation.sln"
+    "dotnet.defaultSolution": "Eulerian Fluid Simulation.sln"
 }
