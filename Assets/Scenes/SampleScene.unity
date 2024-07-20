@@ -243,11 +243,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4c321df53bf76eb75a10a619e3ce06f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  BoundarySize: {x: 20, y: 20}
+  BoundarySize: {x: 10, y: 10}
   SpawnCenter: {x: 0, y: 0}
   SpawnArea: 6
   Gravity: 0
-  CellSize: 0.3
+  SideBlast: 0
+  CellSize: 0.05
   Density: 1000
   GSIters: 30
   OverRelaxation: 1.3

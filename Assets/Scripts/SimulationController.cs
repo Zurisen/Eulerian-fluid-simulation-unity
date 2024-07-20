@@ -15,11 +15,9 @@ public class SimulationController : MonoBehaviour
 {
     // Boundary
     public Vector2 BoundarySize = new Vector2(20, 20);
-    public Vector2 SpawnCenter = new Vector2(5,5);
-    public float SpawnArea = 1f; 
-
     // External forces
     public float Gravity = -9.8f;
+    public bool SideBlast = false;
 
 
     // Fluid
@@ -40,6 +38,8 @@ public class SimulationController : MonoBehaviour
     public int GSIters = 10;
     public float OverRelaxation = 1.8f;
     public bool VorticityConfinement = true;
+
+    private Vector2 _lastMousePosition;
     void Awake()
     {
         // Fluid
@@ -61,13 +61,11 @@ public class SimulationController : MonoBehaviour
         {
             _cellType[i] = CellType.Fluid;
         }
-        InitFume();
     }
 
-    void InitFume(){
+    void InitBlast(){
         int centerY = numCellsY/2;
-        // int fumeWidth = (int) (0.1f*numCellsY); 
-        int fumeWidth = 1;
+        int fumeWidth = (int) (0.02f*numCellsY); 
         int i = 0;
         for (int j = centerY-fumeWidth; j < centerY+fumeWidth; j++)
         {
@@ -80,12 +78,14 @@ public class SimulationController : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        InitFume();
+        if (SideBlast) InitBlast();
         ApplyGravity();
         SolveIncompressibility(GSIters, OverRelaxation);
 
         ExtrapolateVelocities();
         ApplyAdvection();
+
+        HandleMouseInput();
     }
 
     void ApplyGravity(){
@@ -312,6 +312,40 @@ public class SimulationController : MonoBehaviour
     }
 
 
+private void HandleMouseInput()
+{
+    if (Input.GetMouseButtonDown(0))
+    {
+        _lastMousePosition = Input.mousePosition;
+    }
+
+    if (Input.GetMouseButton(0))
+    {
+        Vector2 currentMousePosition = Input.mousePosition;
+        Vector2 mouseDelta = currentMousePosition - _lastMousePosition;
+
+        if (mouseDelta.magnitude > 0)
+        {
+            Vector2 worldPosition = Camera.main.ScreenToWorldPoint(currentMousePosition);
+            Vector2 lastWorldPosition = Camera.main.ScreenToWorldPoint(_lastMousePosition);
+            Vector2 direction = (worldPosition - lastWorldPosition).normalized;
+            float speed = mouseDelta.magnitude / Time.deltaTime;
+
+            // Adjust the world position to match grid coordinates
+            int cellX = Mathf.FloorToInt((worldPosition.x + BoundarySize.x / 2) / h);
+            int cellY = Mathf.FloorToInt((worldPosition.y + BoundarySize.y / 2) / h);
+
+            if (cellX >= 0 && cellX < numCellsX && cellY >= 0 && cellY < numCellsY && checkIfCellIsValid(cellX, cellY))
+            {
+                int cellIndex = getCellNrFromCoord(cellX, cellY);
+                _cellVel[cellIndex] += new Vector2(direction.x, direction.y) * speed;
+            }
+
+            _lastMousePosition = currentMousePosition;
+        }
+    }
+}
+
 
 
     void OnDrawGizmos() {
@@ -331,7 +365,7 @@ public class SimulationController : MonoBehaviour
 
                 // Calculate color based on velocity magnitude
                 float velocityMagnitude = _cellVel[cellIndex].magnitude;
-                Color cellColor = Color.Lerp(Color.blue, Color.white, velocityMagnitude / 50f);
+                Color cellColor = Color.Lerp(Color.black, Color.cyan, velocityMagnitude / 10f);
                 Gizmos.color = cellColor.WithAlpha(0.4f);
                 // Draw the cell
                 Gizmos.DrawCube(cellPos, new Vector3(h, h, 0));
