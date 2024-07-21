@@ -16,7 +16,6 @@ public class SimulationController : MonoBehaviour
     // Boundary
     public Vector2 BoundarySize = new Vector2(20, 20);
     // External forces
-    public float Gravity = -9.8f;
     public bool SideBlast = false;
 
 
@@ -34,12 +33,14 @@ public class SimulationController : MonoBehaviour
     private float[] p;
     private float[] s;
 
-    public float Density = 1f;
     public int GSIters = 10;
     public float OverRelaxation = 1.8f;
     public bool VorticityConfinement = true;
 
     private Vector2 _lastMousePosition;
+
+    public GameObject cellPrefab;
+    private SpriteRenderer[] _cellRenderers;
     void Awake()
     {
         // Fluid
@@ -53,6 +54,24 @@ public class SimulationController : MonoBehaviour
         p = new float[numCells];
         s = new float[numCells];
 
+        // Initialize cell objects and their renderers
+        _cellRenderers = new SpriteRenderer[numCells];
+        for (int i = 0; i < numCellsX; i++)
+        {
+            for (int j = 0; j < numCellsY; j++)
+            {
+                int cellIndex = getCellNrFromCoord(i, j);
+                Vector3 cellPosition = new Vector3(
+                    i * h - BoundarySize.x / 2 + h/2,
+                    j * h - BoundarySize.y / 2 + h/2,
+                    0);
+
+                GameObject cell = Instantiate(cellPrefab, cellPosition, Quaternion.identity, transform);
+                _cellRenderers[cellIndex] = cell.GetComponent<SpriteRenderer>();
+                _cellRenderers[cellIndex].size = Vector2.one*h;
+            }
+        }
+
 
     }
 
@@ -62,6 +81,16 @@ public class SimulationController : MonoBehaviour
             _cellType[i] = CellType.Fluid;
         }
     }
+
+    void UpdateGrid(){
+        for (int i = 0; i < numCells; i++)
+        {
+            var velMagnitude = _cellVel[i].magnitude;
+            Color cellColor = Color.Lerp(Color.black, Color.cyan, velMagnitude / 10f);
+            _cellRenderers[i].color = cellColor;
+        }
+    }
+
 
     void InitBlast(){
         int centerY = numCellsY/2;
@@ -79,31 +108,15 @@ public class SimulationController : MonoBehaviour
     void Update()
     {
         if (SideBlast) InitBlast();
-        ApplyGravity();
         SolveIncompressibility(GSIters, OverRelaxation);
 
         ExtrapolateVelocities();
         ApplyAdvection();
 
         HandleMouseInput();
+        UpdateGrid();
     }
 
-    void ApplyGravity(){
-        var n = numCellsY;
-        for (int i = 0; i < numCellsX; i++)
-        {
-            for (int j = 0; j < numCellsY; j++)
-            {
-                // if it is solid or the last cell above the ground, we donot update the velocity
-                var isValid = checkIfCellIsValid(i, j);
-                var isBottomValid = checkIfCellIsValid(i, j-1);
-
-                if (isValid && isBottomValid){
-                    _cellVel[i*n + j] += Vector2.up*Gravity*Time.deltaTime;  
-                }
-            }
-        }
-    }
 
     private int getCellNrFromCoord(int i, int j) {
         return Math.Clamp(i * numCellsY + j, 0, numCells - 1);
@@ -122,7 +135,6 @@ public class SimulationController : MonoBehaviour
     void SolveIncompressibility(int numIters, float overRelaxation)
     {
         int n = numCellsY;
-        float cp = Density * h / Time.deltaTime;  // Assuming density is 1 for simplicity, adjust if needed
         // Initialize pressure
         Array.Clear(p, 0, p.Length);
 
@@ -132,9 +144,9 @@ public class SimulationController : MonoBehaviour
         // Iterate to solve for pressure
         for (int iter = 0; iter < numIters; iter++)
         {
-            for (int i = 0; i < numCellsX; i++)
+            for (int i = 1; i < numCellsX-1; i++)
             {
-                for (int j = 0; j < numCellsY; j++)
+                for (int j = 1; j < numCellsY-1; j++)
                 {
 
                     if (!checkIfCellIsValid(i, j)) continue;
@@ -159,7 +171,6 @@ public class SimulationController : MonoBehaviour
                         float newPressure = -div / denominator;
 
                         newPressure *= overRelaxation;
-                        p[left] += cp * newPressure;
 
                         if (isValidLeft) _cellVel[left].x -= newPressure;
                         if (isValidRight) _cellVel[right].x += newPressure;
@@ -192,9 +203,9 @@ public class SimulationController : MonoBehaviour
 
         Vector2[] newVel = new Vector2[numCells];
 
-        for (int i = 0; i < numCellsX; i++)
+        for (int i = 1; i < numCellsX-1; i++)
         {
-            for (int j = 0; j < numCellsY; j++)
+            for (int j = 1; j < numCellsY-1; j++)
             {
                 if (!checkIfCellIsValid(i,j)) continue;
                 
@@ -350,43 +361,10 @@ private void HandleMouseInput()
 
     void OnDrawGizmos() {
         Gizmos.color = Color.blue;
-        Gizmos.DrawWireCube(Vector2.zero, BoundarySize);
-
-
-        // Draw grid cells
-        for (int i = 0; i < numCellsX; i++) {
-            for (int j = 0; j < numCellsY; j++) {
-                int cellIndex = i * numCellsY + j;
-
-                // Calculate cell position
-                float xPos = i * h - BoundarySize.x / 2 + h / 2;
-                float yPos = j * h - BoundarySize.y / 2 + h / 2;
-                Vector2 cellPos = new Vector2(xPos, yPos);
-
-                // Calculate color based on velocity magnitude
-                float velocityMagnitude = _cellVel[cellIndex].magnitude;
-                Color cellColor = Color.Lerp(Color.black, Color.cyan, velocityMagnitude / 10f);
-                Gizmos.color = cellColor.WithAlpha(0.4f);
-                // Draw the cell
-                Gizmos.DrawCube(cellPos, new Vector3(h, h, 0));
-                
-                // Draw velocity text
-                //Handles.color = Color.white;
-                GUIStyle style = new GUIStyle();
-                style.fontSize = 8;
-                style.normal.textColor = Color.white;
-                //Handles.Label(cellPos+new Vector2(0, h/2), ((int)velocityMagnitude).ToString(), style);
-
-                // Draw velocity vector
-                // Vector2 velocity = _cellVel[cellIndex].normalized/3;
-                // Vector3 endPos = new Vector3(cellPos.x + velocity.x, cellPos.y + velocity.y, 0);
-                // Gizmos.color = Color.white;
-                // DrawArrow(new Vector3(cellPos.x, cellPos.y, 0), endPos);
-
-            }
-
-        }   
+        Gizmos.DrawWireCube(new Vector2(-2*h,-2*h), BoundarySize);
     }
+
+
     void DrawArrow(Vector3 start, Vector3 end) {
         Gizmos.DrawLine(start, end);
         

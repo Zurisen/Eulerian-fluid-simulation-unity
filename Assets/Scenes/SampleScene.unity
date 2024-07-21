@@ -243,16 +243,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4c321df53bf76eb75a10a619e3ce06f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  BoundarySize: {x: 10, y: 10}
-  SpawnCenter: {x: 0, y: 0}
-  SpawnArea: 6
-  Gravity: 0
-  SideBlast: 0
-  CellSize: 0.05
+  BoundarySize: {x: 20, y: 20}
+  SideBlast: 1
+  CellSize: 0.15
   Density: 1000
-  GSIters: 30
-  OverRelaxation: 1.3
+  GSIters: 10
+  OverRelaxation: 1.4
   VorticityConfinement: 1
+  cellPrefab: {fileID: 2630894227977318393, guid: 58087d7c0c492ea598350f15b2dabc3d, type: 3}
 --- !u!4 &872552904
 Transform:
   m_ObjectHideFlags: 0
