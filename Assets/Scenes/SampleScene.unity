@@ -246,7 +246,6 @@ MonoBehaviour:
   BoundarySize: {x: 20, y: 20}
   SideBlast: 1
   CellSize: 0.15
-  Density: 1000
   GSIters: 10
   OverRelaxation: 1.4
   VorticityConfinement: 1
