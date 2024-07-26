@@ -1,0 +1,85 @@
+#pragma kernel CSMain
+#pragma kernel ExtrapolateVelocities
+#pragma kernel ApplyAdvection
+
+#define NUM_THREADS_X 16
+#define NUM_THREADS_Y 16
+
+// Parameters
+cbuffer Params
+{
+    float deltaTime;
+    int numCellsX;
+    int numCellsY;
+    float h;
+    float overRelaxation;
+    int vorticityConfinement;
+}
+
+// Buffers
+RWStructuredBuffer<float2> cellVel;
+RWStructuredBuffer<float2> cellPrevVel;
+StructuredBuffer<float> p;
+RWStructuredBuffer<float> s;
+StructuredBuffer<int> cellType;
+
+// Main kernel
+[numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID)
+{
+    uint i = id.x;
+    uint j = id.y;
+
+    if (i >= numCellsX || j >= numCellsY) return;
+
+    uint index = i * numCellsY + j;
+
+    cellPrevVel[index] = cellVel[index];
+
+    // You can add more operations here for your simulation logic
+}
+
+// Kernel for extrapolating velocities
+[numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
+void ExtrapolateVelocities(uint3 id : SV_DispatchThreadID)
+{
+    uint i = id.x;
+    uint j = id.y;
+
+    if (i >= numCellsX || j >= numCellsY) return;
+
+    uint index = i * numCellsY + j;
+
+    if (i == 0 || j == 0 || i == numCellsX - 1 || j == numCellsY - 1) return;
+
+    cellVel[index].x = cellPrevVel[index].x;
+    cellVel[index].y = cellPrevVel[index].y;
+}
+
+// Kernel for applying advection
+[numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
+void ApplyAdvection(uint3 id : SV_DispatchThreadID)
+{
+    uint i = id.x;
+    uint j = id.y;
+
+    if (i >= numCellsX || j >= numCellsY) return;
+
+    uint index = i * numCellsY + j;
+
+    if (i == 0 || j == 0 || i == numCellsX - 1 || j == numCellsY - 1) return;
+
+    float2 avg = (cellVel[index - 1] + cellVel[index + 1] + cellVel[index - numCellsY] + cellVel[index + numCellsY]) / 4.0f;
+
+    float x_u = i * h - cellVel[index].x * deltaTime;
+    float y_u = j * h + h / 2.0f - avg.y * deltaTime;
+
+    float u = cellVel[index].x * (1.0f - x_u) + cellVel[index + 1].x * x_u;
+
+    float x_v = i * h + h / 2.0f - avg.x * deltaTime;
+    float y_v = j * h - cellVel[index].y * deltaTime;
+
+    float v = cellVel[index].y * (1.0f - y_v) + cellVel[index + numCellsY].y * y_v;
+
+    cellVel[index] = float2(u, v);
+}

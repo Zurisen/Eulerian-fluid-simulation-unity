@@ -67,6 +67,7 @@
     <Compile Include="Assets/Scripts/SimulationController.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Assets/Shaders/FluidComputeShader.compute" />
     <None Include="Assets/Shaders/SmoothingRadiusShader.shader" />
   </ItemGroup>
   <ItemGroup>

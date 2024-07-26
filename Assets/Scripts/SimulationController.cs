@@ -1,15 +1,7 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Linq;
-using System.Xml.Schema;
-using System.Xml.XPath;
-using Unity.Collections;
-using Unity.VisualScripting;
-using UnityEditor;
-using UnityEditor.U2D.Aseprite;
+using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.UIElements;
 
 public class SimulationController : MonoBehaviour
 {
@@ -41,6 +33,8 @@ public class SimulationController : MonoBehaviour
 
     public GameObject cellPrefab;
     private SpriteRenderer[] _cellRenderers;
+
+    private float dt;
     void Awake()
     {
         // Fluid
@@ -76,13 +70,15 @@ public class SimulationController : MonoBehaviour
     }
 
     void Start(){
+        dt = Time.deltaTime;
         for (int i = 0; i < numCells; i++)
         {
             _cellType[i] = CellType.Fluid;
         }
     }
 
-    void UpdateGrid(){
+    void UpdateGrid()
+    {
         for (int i = 0; i < numCells; i++)
         {
             var velMagnitude = _cellVel[i].magnitude;
@@ -90,6 +86,7 @@ public class SimulationController : MonoBehaviour
             _cellRenderers[i].color = cellColor;
         }
     }
+
 
 
     void InitBlast(){
@@ -135,114 +132,96 @@ public class SimulationController : MonoBehaviour
     void SolveIncompressibility(int numIters, float overRelaxation)
     {
         int n = numCellsY;
-        // Initialize pressure
         Array.Clear(p, 0, p.Length);
-
-        // Save previous velocities
         Array.Copy(_cellVel, _cellPrevVel, _cellVel.Length);
 
-        // Iterate to solve for pressure
         for (int iter = 0; iter < numIters; iter++)
         {
-            for (int i = 1; i < numCellsX-1; i++)
+            Parallel.For(0, numCellsX * numCellsY, index =>
             {
-                for (int j = 1; j < numCellsY-1; j++)
+                int i = index / numCellsY;
+                int j = index % numCellsY;
+
+                if (i == 0 || i == numCellsX - 1 || j == 0 || j == numCellsY - 1) return;
+                if (!checkIfCellIsValid(i, j)) return;
+
+                int left = i * n + j;
+                int right = (i + 1) * n + j;
+                int bottom = i * n + j;
+                int top = i * n + (j + 1);
+
+                var isValidLeft = checkIfCellIsValid(i, j);
+                var isValidRight = checkIfCellIsValid(i + 1, j);
+                var isValidTop = checkIfCellIsValid(i, j + 1);
+                var isValidBot = checkIfCellIsValid(i, j);
+
+                float div = (isValidRight ? _cellVel[right].x : 0f) -
+                            (isValidLeft ? _cellVel[left].x : 0f) +
+                            (isValidTop ? _cellVel[top].y : 0f) -
+                            (isValidBot ? _cellVel[bottom].y : 0f);
+                float denominator = new bool[] { isValidLeft, isValidRight, isValidTop, isValidBot }.Count(b => b);
+
+                if (denominator > 0)
                 {
+                    float newPressure = -div / denominator;
+                    newPressure *= overRelaxation;
 
-                    if (!checkIfCellIsValid(i, j)) continue;
-
-                    int left = i * n + j;
-                    int right = (i + 1) * n + j;
-                    int bottom = i * n + j;
-                    int top = i * n + (j + 1);
-
-                    var isValidLeft = checkIfCellIsValid(i, j);
-                    var isValidRight = checkIfCellIsValid(i+1, j);
-                    var isValidTop = checkIfCellIsValid(i, j+1);
-                    var isValidBot = checkIfCellIsValid(i, j);
-
-                    float div = (isValidRight ? _cellVel[right].x : 0f) - 
-                                (isValidLeft ? _cellVel[left].x : 0f) + 
-                                (isValidTop ? _cellVel[top].y : 0f) - 
-                                (isValidBot ? _cellVel[bottom].y : 0f);
-                    float denominator = new bool[] { isValidLeft, isValidRight, isValidTop, isValidBot }.Count(b => b);
-
-                    if (denominator > 0){
-                        float newPressure = -div / denominator;
-
-                        newPressure *= overRelaxation;
-
-                        if (isValidLeft) _cellVel[left].x -= newPressure;
-                        if (isValidRight) _cellVel[right].x += newPressure;
-                        if (isValidBot) _cellVel[bottom].y -= newPressure;
-                        if (isValidTop) _cellVel[top].y += newPressure;
-                    }
-
+                    if (isValidLeft) _cellVel[left].x -= newPressure;
+                    if (isValidRight) _cellVel[right].x += newPressure;
+                    if (isValidBot) _cellVel[bottom].y -= newPressure;
+                    if (isValidTop) _cellVel[top].y += newPressure;
                 }
-            }
+            });
         }
-
     }
 
-    void ExtrapolateVelocities(){
+    void ExtrapolateVelocities()
+    {
         var n = numCellsY;
-        for (int i = 0; i < numCellsX; i++)
+        Parallel.For(0, numCellsX, i =>
         {
-            _cellVel[i*n + 0].x = _cellVel[i*n +1].x;
-            _cellVel[i*n + numCellsY-1].x = _cellVel[i*n + numCellsY-2].x; 
-        }
+            _cellVel[i * n + 0].x = _cellVel[i * n + 1].x;
+            _cellVel[i * n + numCellsY - 1].x = _cellVel[i * n + numCellsY - 2].x;
+        });
 
-        for (int j = 0; j < numCellsY; j++)
+        Parallel.For(0, numCellsY, j =>
         {
-            _cellVel[0*n + j].y = _cellVel[1*n + j].y;
-            _cellVel[(numCellsX-1)*n + j].y = _cellVel[(numCellsX-2)*n + j].y;
-        }
+            _cellVel[0 * n + j].y = _cellVel[1 * n + j].y;
+            _cellVel[(numCellsX - 1) * n + j].y = _cellVel[(numCellsX - 2) * n + j].y;
+        });
     }
 
-    void ApplyAdvection(){
-
+    void ApplyAdvection()
+    {
         Vector2[] newVel = new Vector2[numCells];
 
-        for (int i = 1; i < numCellsX-1; i++)
+        Parallel.For(0, numCells, index =>
         {
-            for (int j = 1; j < numCellsY-1; j++)
+            int i = index / numCellsY;
+            int j = index % numCellsY;
+
+            if (i == 0 || i == numCellsX - 1 || j == 0 || j == numCellsY - 1) return;
+            if (!checkIfCellIsValid(i, j)) return;
+
+            var n = getCellNrFromCoord(i, j);
+
+            if (VorticityConfinement)
             {
-                if (!checkIfCellIsValid(i,j)) continue;
-                
-                var n = getCellNrFromCoord(i,j);
-                
-                // We compute the previous location of the semi-lagrangian particle that 
-                // would arrive at the position where the velocities are located 
-                if (VorticityConfinement){
-                    var avg = AverageVector(i, j);
-                    
-                    //// for the x component of the velocity, located at (i*h, j*h+h/2)
-                    var x_u = i*h -_cellVel[n].x*Time.deltaTime;
-                    var y_u = j*h+h/2 -avg.y*Time.deltaTime;
-                    //// now that we now the position, we interpolate the velocity (since this position doesn't correspond to the
-                    /// staggered grid velocities positions)
-                    var u = InterpolateField(x_u, y_u, _cellVel, component: 0);
+                var avg = AverageVector(i, j);
 
+                var x_u = i * h - _cellVel[n].x * dt;
+                var y_u = j * h + h / 2 - avg.y * dt;
+                var u = InterpolateField(x_u, y_u, _cellVel, 0);
 
-                    //// for the y component of the velocity, located at (i*h, j*h+h/2)
-                    var x_v = i*h+h/2 -avg.x*Time.deltaTime;
-                    var y_v = j*h - _cellVel[n].y*Time.deltaTime;
-                    //// now that we now the position, we interpolate the velocity (since this position doesn't correspond to the
-                    /// staggered grid velocities positions)
-                    var v = InterpolateField(x_v, y_v, _cellVel, component: 1);
+                var x_v = i * h + h / 2 - avg.x * dt;
+                var y_v = j * h - _cellVel[n].y * dt;
+                var v = InterpolateField(x_v, y_v, _cellVel, 1);
 
-                    newVel[n] = new Vector2(u, v);
-                }
-
-
-
+                newVel[n] = new Vector2(u, v);
             }
-            
-        }
+        });
 
-        // Now we move the semilagrangian particle "previous" velocity to the current cell velocity
         Array.Copy(newVel, _cellVel, numCells);
-
     }
 
     Vector2 AverageVector(int i, int j){
@@ -323,39 +302,39 @@ public class SimulationController : MonoBehaviour
     }
 
 
-private void HandleMouseInput()
-{
-    if (Input.GetMouseButtonDown(0))
+    private void HandleMouseInput()
     {
-        _lastMousePosition = Input.mousePosition;
-    }
-
-    if (Input.GetMouseButton(0))
-    {
-        Vector2 currentMousePosition = Input.mousePosition;
-        Vector2 mouseDelta = currentMousePosition - _lastMousePosition;
-
-        if (mouseDelta.magnitude > 0)
+        if (Input.GetMouseButtonDown(0))
         {
-            Vector2 worldPosition = Camera.main.ScreenToWorldPoint(currentMousePosition);
-            Vector2 lastWorldPosition = Camera.main.ScreenToWorldPoint(_lastMousePosition);
-            Vector2 direction = (worldPosition - lastWorldPosition).normalized;
-            float speed = mouseDelta.magnitude / Time.deltaTime;
+            _lastMousePosition = Input.mousePosition;
+        }
 
-            // Adjust the world position to match grid coordinates
-            int cellX = Mathf.FloorToInt((worldPosition.x + BoundarySize.x / 2) / h);
-            int cellY = Mathf.FloorToInt((worldPosition.y + BoundarySize.y / 2) / h);
+        if (Input.GetMouseButton(0))
+        {
+            Vector2 currentMousePosition = Input.mousePosition;
+            Vector2 mouseDelta = currentMousePosition - _lastMousePosition;
 
-            if (cellX >= 0 && cellX < numCellsX && cellY >= 0 && cellY < numCellsY && checkIfCellIsValid(cellX, cellY))
+            if (mouseDelta.magnitude > 0)
             {
-                int cellIndex = getCellNrFromCoord(cellX, cellY);
-                _cellVel[cellIndex] += new Vector2(direction.x, direction.y) * speed;
-            }
+                Vector2 worldPosition = Camera.main.ScreenToWorldPoint(currentMousePosition);
+                Vector2 lastWorldPosition = Camera.main.ScreenToWorldPoint(_lastMousePosition);
+                Vector2 direction = (worldPosition - lastWorldPosition).normalized;
+                float speed = mouseDelta.magnitude / dt;
 
-            _lastMousePosition = currentMousePosition;
+                // Adjust the world position to match grid coordinates
+                int cellX = Mathf.FloorToInt((worldPosition.x + BoundarySize.x / 2) / h);
+                int cellY = Mathf.FloorToInt((worldPosition.y + BoundarySize.y / 2) / h);
+
+                if (cellX >= 0 && cellX < numCellsX && cellY >= 0 && cellY < numCellsY && checkIfCellIsValid(cellX, cellY))
+                {
+                    int cellIndex = getCellNrFromCoord(cellX, cellY);
+                    _cellVel[cellIndex] += new Vector2(direction.x, direction.y) * speed;
+                }
+
+                _lastMousePosition = currentMousePosition;
+            }
         }
     }
-}
 
 
 
