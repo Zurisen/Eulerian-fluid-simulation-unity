@@ -1,11 +1,12 @@
-#pragma kernel CSMain
-#pragma kernel ExtrapolateVelocities
+
+
+#pragma kernel SolveIncompressibilityRed
+#pragma kernel SolveIncompressibilityBlack
 #pragma kernel ApplyAdvection
 
 #define NUM_THREADS_X 16
 #define NUM_THREADS_Y 16
 
-// Parameters
 cbuffer Params
 {
     float deltaTime;
@@ -16,70 +17,188 @@ cbuffer Params
     int vorticityConfinement;
 }
 
-// Buffers
 RWStructuredBuffer<float2> cellVel;
 RWStructuredBuffer<float2> cellPrevVel;
-StructuredBuffer<float> p;
+RWStructuredBuffer<float> p;
 RWStructuredBuffer<float> s;
-StructuredBuffer<int> cellType;
 
-// Main kernel
-[numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
-void CSMain(uint3 id : SV_DispatchThreadID)
+int getCellNrFromCoord(int i, int j)
 {
-    uint i = id.x;
-    uint j = id.y;
-
-    if (i >= numCellsX || j >= numCellsY) return;
-
-    uint index = i * numCellsY + j;
-
-    cellPrevVel[index] = cellVel[index];
-
-    // You can add more operations here for your simulation logic
+    return clamp(i * numCellsY + j, 0, numCellsX * numCellsY - 1);
 }
 
-// Kernel for extrapolating velocities
-[numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
-void ExtrapolateVelocities(uint3 id : SV_DispatchThreadID)
+bool checkIfCellIsValid(int i, int j)
 {
-    uint i = id.x;
-    uint j = id.y;
-
-    if (i >= numCellsX || j >= numCellsY) return;
-
-    uint index = i * numCellsY + j;
-
-    if (i == 0 || j == 0 || i == numCellsX - 1 || j == numCellsY - 1) return;
-
-    cellVel[index].x = cellPrevVel[index].x;
-    cellVel[index].y = cellPrevVel[index].y;
+    if (i < 0 || j < 0 || i > numCellsX-1 || j >= numCellsY-1) return false;
+    return true;
 }
 
-// Kernel for applying advection
+float2 AverageVector(int i, int j)
+{
+    int topleft = getCellNrFromCoord(i - 1, j + 1);
+    int topright = getCellNrFromCoord(i, j + 1);
+    int botleft = getCellNrFromCoord(i - 1, j);
+    int botright = getCellNrFromCoord(i, j);
+
+    bool isValidTopLeft = checkIfCellIsValid(i - 1, j + 1);
+    bool isValidTopRight = checkIfCellIsValid(i, j + 1);
+    bool isValidBotLeft = checkIfCellIsValid(i - 1, j);
+    bool isValidBotRight = checkIfCellIsValid(i, j);
+
+    float avgY = (isValidTopLeft ? cellVel[topleft].y : 0.0f) +
+                 (isValidTopRight ? cellVel[topright].y : 0.0f) +
+                 (isValidBotLeft ? cellVel[botleft].y : 0.0f) +
+                 (isValidBotRight ? cellVel[botright].y : 0.0f);
+    avgY /= 4.0f;
+
+    topleft = getCellNrFromCoord(i, j);
+    topright = getCellNrFromCoord(i + 1, j);
+    botleft = getCellNrFromCoord(i, j - 1);
+    botright = getCellNrFromCoord(i + 1, j - 1);
+
+    isValidTopLeft = checkIfCellIsValid(i, j);
+    isValidTopRight = checkIfCellIsValid(i + 1, j);
+    isValidBotLeft = checkIfCellIsValid(i, j - 1);
+    isValidBotRight = checkIfCellIsValid(i + 1, j - 1);
+
+    float avgX = (isValidTopLeft ? cellVel[topleft].x : 0.0f) +
+                 (isValidTopRight ? cellVel[topright].x : 0.0f) +
+                 (isValidBotLeft ? cellVel[botleft].x : 0.0f) +
+                 (isValidBotRight ? cellVel[botright].x : 0.0f);
+    avgX /= 4.0f;
+
+    return float2(avgX, avgY);
+}
+
+float InterpolateField(float x, float y, RWStructuredBuffer<float2> field, int component)
+{
+    float h2 = h / 2.0f;
+
+    float x0 = clamp(floor((x - h2) / h), 0.0f, float(numCellsX - 1));
+    float tx = ((x - h2) - x0 * h) / h;
+    float x1 = min(x0 + 1.0f, float(numCellsX - 1));
+
+    float y0 = clamp(floor((y - h2) / h), 0.0f, float(numCellsY - 1));
+    float ty = ((y - h2) - y0 * h) / h;
+    float y1 = min(y0 + 1.0f, float(numCellsY - 1));
+
+    float sx = 1.0f - tx;
+    float sy = 1.0f - ty;
+
+    int n = numCellsY;
+    int indx0 = getCellNrFromCoord((int)x0, (int)y0);
+    int indx1 = getCellNrFromCoord((int)x1, (int)y0);
+    int indx2 = getCellNrFromCoord((int)x1, (int)y1);
+    int indx3 = getCellNrFromCoord((int)x0, (int)y1);
+
+    float val = 0.0f;
+
+    if (component == 0)
+    {
+        val = sx * sy * field[indx0].x +
+              tx * sy * field[indx1].x +
+              tx * ty * field[indx2].x +
+              sx * ty * field[indx3].x;
+    }
+    else if (component == 1)
+    {
+        val = sx * sy * field[indx0].y +
+              tx * sy * field[indx1].y +
+              tx * ty * field[indx2].y +
+              sx * ty * field[indx3].y;
+    }
+
+    return val;
+}
+
+void SolveIncompressibilityKernel(uint3 id, bool isRedPass)
+{
+    int index = id.x * numCellsY + id.y;
+    if (index >= numCellsX * numCellsY) return;
+
+    int i = id.x;
+    int j = id.y;
+
+    // Check if cell belongs to the current pass (red or black)
+    if (((i + j) % 2 == 0) != isRedPass) return;
+
+    if (!checkIfCellIsValid(i, j)) return;
+
+    int n = numCellsY;
+
+    int left = i * n + j;
+    int right = (i + 1) * n + j;
+    int bottom = i * n + j;
+    int top = i * n + (j + 1);
+
+    bool isValidLeft = checkIfCellIsValid(i, j);
+    bool isValidRight = checkIfCellIsValid(i + 1, j);
+    bool isValidTop = checkIfCellIsValid(i, j + 1);
+    bool isValidBot = checkIfCellIsValid(i, j);
+
+    float div = (isValidRight ? cellVel[right].x : 0.0) -
+                (isValidLeft ? cellVel[left].x : 0.0) +
+                (isValidTop ? cellVel[top].y : 0.0) -
+                (isValidBot ? cellVel[bottom].y : 0.0);
+
+    float denominator = (isValidLeft ? 1.0 : 0.0) +
+                        (isValidRight ? 1.0 : 0.0) +
+                        (isValidTop ? 1.0 : 0.0) +
+                        (isValidBot ? 1.0 : 0.0);
+
+    if (denominator > 0.0)
+    {
+        float newPressure = -div / denominator;
+        newPressure *= overRelaxation;
+
+        if (isValidLeft) cellVel[left].x -= newPressure;
+        if (isValidRight) cellVel[right].x += newPressure;
+        if (isValidBot) cellVel[bottom].y -= newPressure;
+        if (isValidTop) cellVel[top].y += newPressure;
+    }
+}
+
+[numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
+void SolveIncompressibilityRed(uint3 id : SV_DispatchThreadID)
+{
+    SolveIncompressibilityKernel(id, true);
+}
+
+[numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
+void SolveIncompressibilityBlack(uint3 id : SV_DispatchThreadID)
+{
+    SolveIncompressibilityKernel(id, false);
+}
+
+
 [numthreads(NUM_THREADS_X, NUM_THREADS_Y, 1)]
 void ApplyAdvection(uint3 id : SV_DispatchThreadID)
 {
-    uint i = id.x;
-    uint j = id.y;
+    int index = id.x * numCellsY + id.y;
+    if (index >= numCellsX * numCellsY) return;
 
-    if (i >= numCellsX || j >= numCellsY) return;
+    int i = id.x;
+    int j = id.y;
 
-    uint index = i * numCellsY + j;
+    if (i == 0 || i == numCellsX - 1 || j == 0 || j == numCellsY - 1) return;
+    
+    if (!checkIfCellIsValid(i, j)) return;
 
-    if (i == 0 || j == 0 || i == numCellsX - 1 || j == numCellsY - 1) return;
+    int n = getCellNrFromCoord(i, j);
 
-    float2 avg = (cellVel[index - 1] + cellVel[index + 1] + cellVel[index - numCellsY] + cellVel[index + numCellsY]) / 4.0f;
+    if (vorticityConfinement)
+    {
+        float2 avg = AverageVector(i, j);
 
-    float x_u = i * h - cellVel[index].x * deltaTime;
-    float y_u = j * h + h / 2.0f - avg.y * deltaTime;
+        float x_u = i * h - cellVel[n].x * deltaTime;
+        float y_u = j * h + h / 2.0f - avg.y * deltaTime;
+        float u = InterpolateField(x_u, y_u, cellVel, 0);
 
-    float u = cellVel[index].x * (1.0f - x_u) + cellVel[index + 1].x * x_u;
+        float x_v = i * h + h / 2.0f - avg.x * deltaTime;
+        float y_v = j * h - cellVel[n].y * deltaTime;
+        float v = InterpolateField(x_v, y_v, cellVel, 1);
 
-    float x_v = i * h + h / 2.0f - avg.x * deltaTime;
-    float y_v = j * h - cellVel[index].y * deltaTime;
-
-    float v = cellVel[index].y * (1.0f - y_v) + cellVel[index + numCellsY].y * y_v;
-
-    cellVel[index] = float2(u, v);
+        cellVel[n] = float2(u, v);
+    }
 }
+
