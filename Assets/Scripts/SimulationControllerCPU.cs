@@ -3,7 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using UnityEngine;
 
-public class SimulationController : MonoBehaviour
+public class SimulationControllerCPU : MonoBehaviour
 {
     // Boundary
     public Vector2 BoundarySize = new Vector2(20, 20);
@@ -105,9 +105,9 @@ public class SimulationController : MonoBehaviour
     void Update()
     {
         if (SideBlast) InitBlast();
-        SolveIncompressibility(GSIters, OverRelaxation);
+        // SolveIncompressibility(GSIters, OverRelaxation);
 
-        ExtrapolateVelocities();
+        // ExtrapolateVelocities();
         ApplyAdvection();
 
         HandleMouseInput();
@@ -265,14 +265,15 @@ public class SimulationController : MonoBehaviour
     float InterpolateField(float x, float y, Vector2[] field, int component){
         if (component > 1 || component < 0) throw new Exception("Wrong component to interpolate field");
 
-        float h2 = h/2;
+        float dx = component==1 ? h/2 : 0;
+        float dy = component==0 ? h/2 : 0;
         
-        float x0 = (float)Math.Min(Math.Floor((x-h2)/h), numCellsX-1);
-        float tx = ((x-h2) - x0*h)/h;
+        float x0 = (float)Math.Min(Math.Floor((x-dx)/h), numCellsX-1);
+        float tx = ((x-dx) - x0*h)/h;
         float x1 = Math.Min(x0+1, numCellsX-1);
 
-        float y0 = (float)Math.Min(Math.Floor((y-h2)/h), numCellsY-1);
-        float ty = ((y-h2) - y0*h)/h;
+        float y0 = (float)Math.Min(Math.Floor((y-dy)/h), numCellsY-1);
+        float ty = ((y-dy) - y0*h)/h;
         float y1 = Math.Min(y0+1, numCellsX-1);
     
         float sx = 1.0f - tx;
@@ -339,20 +340,28 @@ public class SimulationController : MonoBehaviour
 
 
     void OnDrawGizmos() {
-        Gizmos.color = Color.blue;
-        Gizmos.DrawWireCube(new Vector2(-2*h,-2*h), BoundarySize);
+        Gizmos.color = Color.white;
+        for (int index = 0; index < numCells; index++)
+        {
+            int i = index / numCellsY;
+            int j = index % numCellsY;
+            // Calculate cell position
+            float xPos = i * h - BoundarySize.x / 2 + h / 2;
+            float yPos = j * h - BoundarySize.y / 2 + h / 2;
+            Vector2 cellPos = new Vector2(xPos, yPos);   
+            Gizmos.DrawWireCube(cellPos, Vector2.one*h);
+            Vector2 velocityCell = _cellVel[index];
+                   
+            Vector2 velocity = velocityCell.normalized*h/2 *0.85f;
+            Vector2 endPos = new Vector2(cellPos.x + velocity.x, cellPos.y + velocity.y);
+            Vector2 startPos = new Vector2(cellPos.x, cellPos.y);
+            Gizmos.DrawLine(startPos, endPos);
+        }
     }
 
 
     void DrawArrow(Vector3 start, Vector3 end) {
-        Gizmos.DrawLine(start, end);
-        
-        Vector3 direction = (end - start).normalized;
-        Vector3 right = Quaternion.LookRotation(direction) * Quaternion.Euler(0, 180 + 20, 0) * new Vector3(0, 0, 1);
-        Vector3 left = Quaternion.LookRotation(direction) * Quaternion.Euler(0, 180 - 20, 0) * new Vector3(0, 0, 1);
-
-        Gizmos.DrawLine(end, end + right * 0.1f);
-        Gizmos.DrawLine(end, end + left * 0.1f);
+    
     }
 
 

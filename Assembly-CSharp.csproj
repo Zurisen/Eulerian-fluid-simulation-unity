@@ -65,7 +65,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Assets/Scripts/SimulationControllerGPU.cs" />
-    <Compile Include="Assets/Scripts/SimulationController.cs" />
+    <Compile Include="Assets/Scripts/SimulationControllerCPU.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets/Shaders/FluidComputeShader.compute" />
