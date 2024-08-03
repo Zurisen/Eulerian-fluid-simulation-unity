@@ -28,7 +28,6 @@ public class SimulationControllerCPU : MonoBehaviour
     public int GSIters = 10;
     public float OverRelaxation = 1.8f;
     public bool VorticityConfinement = true;
-
     private Vector2 _lastMousePosition;
 
     public GameObject cellPrefab;
@@ -105,9 +104,9 @@ public class SimulationControllerCPU : MonoBehaviour
     void Update()
     {
         if (SideBlast) InitBlast();
-        // SolveIncompressibility(GSIters, OverRelaxation);
-
-        // ExtrapolateVelocities();
+        
+        SolveIncompressibility(GSIters, OverRelaxation);
+        ExtrapolateVelocities();
         ApplyAdvection();
 
         HandleMouseInput();
@@ -214,6 +213,17 @@ public class SimulationControllerCPU : MonoBehaviour
                 var u = InterpolateField(x_u, y_u, _cellVel, 0);
 
                 var x_v = i * h + h / 2 - avg.x * dt;
+                var y_v = j * h - _cellVel[n].y * dt;
+                var v = InterpolateField(x_v, y_v, _cellVel, 1);
+
+                newVel[n] = new Vector2(u, v);
+            } else {
+
+                var x_u = i * h - _cellVel[n].x * dt;
+                var y_u = j * h + h / 2 - _cellVel[n].y * dt;
+                var u = InterpolateField(x_u, y_u, _cellVel, 0);
+
+                var x_v = i * h + h / 2 - _cellVel[n].x * dt;
                 var y_v = j * h - _cellVel[n].y * dt;
                 var v = InterpolateField(x_v, y_v, _cellVel, 1);
 
@@ -339,30 +349,42 @@ public class SimulationControllerCPU : MonoBehaviour
 
 
 
-    void OnDrawGizmos() {
-        Gizmos.color = Color.white;
-        for (int index = 0; index < numCells; index++)
-        {
-            int i = index / numCellsY;
-            int j = index % numCellsY;
-            // Calculate cell position
-            float xPos = i * h - BoundarySize.x / 2 + h / 2;
-            float yPos = j * h - BoundarySize.y / 2 + h / 2;
-            Vector2 cellPos = new Vector2(xPos, yPos);   
-            Gizmos.DrawWireCube(cellPos, Vector2.one*h);
-            Vector2 velocityCell = _cellVel[index];
-                   
-            Vector2 velocity = velocityCell.normalized*h/2 *0.85f;
-            Vector2 endPos = new Vector2(cellPos.x + velocity.x, cellPos.y + velocity.y);
-            Vector2 startPos = new Vector2(cellPos.x, cellPos.y);
-            Gizmos.DrawLine(startPos, endPos);
-        }
-    }
+void OnDrawGizmos() {
+    Gizmos.color = Color.white;
+    for (int index = 0; index < numCells; index++)
+    {
+        int i = index / numCellsY;
+        int j = index % numCellsY;
+        // Calculate cell position
+        float xPos = i * h - BoundarySize.x / 2 + h / 2;
+        float yPos = j * h - BoundarySize.y / 2 + h / 2;
+        Vector2 cellPos = new Vector2(xPos, yPos);   
+        Gizmos.DrawWireCube(cellPos, Vector2.one*h);
+        Vector2 velocityCell = _cellVel[index];
+        Vector2 velocity = velocityCell.normalized*h/2 *0.85f;
+        Vector2 endPos = new Vector2(cellPos.x + velocity.x, cellPos.y + velocity.y);
+        Vector2 startPos = new Vector2(cellPos.x, cellPos.y);
 
+        if (velocityCell.magnitude< 1) continue;
+        // Draw the line
+        Gizmos.DrawLine(startPos, endPos);
 
-    void DrawArrow(Vector3 start, Vector3 end) {
-    
+        // Calculate the direction of the arrow
+        Vector2 direction = (endPos - startPos).normalized;
+
+        // Calculate the size of the arrowhead
+        float arrowSize = 0.1f;
+
+        // Calculate the position of the arrowhead
+        Vector2 arrowPos = endPos - direction * arrowSize;
+
+        // Draw the arrowhead
+        Vector2 arrowPoint1 = arrowPos + new Vector2(-direction.y, direction.x) * arrowSize;
+        Vector2 arrowPoint2 = arrowPos + new Vector2(direction.y, -direction.x) * arrowSize;
+        Gizmos.DrawLine(endPos, arrowPoint1);
+        Gizmos.DrawLine(endPos, arrowPoint2);
     }
+}
 
 
 
