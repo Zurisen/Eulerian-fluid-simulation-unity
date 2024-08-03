@@ -1,0 +1,45 @@
+Base path: '/home/zuri/Unity/Hub/Editor/2022.3.30f1/Editor/Data', plugins path '/home/zuri/Unity/Hub/Editor/2022.3.30f1/Editor/Data/PlaybackEngines'
+Cmd: initializeCompiler
+
+Cmd: compileComputeKernel
+  insize=6035 file=Assets/Shaders/FluidComputeShader.compute kernel=ApplyAdvection ppOnly=0 stripLineD=0 buildPlatform=24 km=<UNITY_VERSION=202239> pKW=UNITY_ENABLE_REFLECTION_BUFFERS UNITY_USE_DITHER_MASK_FOR_ALPHABLENDED_SHADOWS UNITY_PBS_USE_BRDF1 UNITY_SPECCUBE_BOX_PROJECTION UNITY_SPECCUBE_BLENDING UNITY_ENABLE_DETAIL_NORMALMAP SHADER_API_DESKTOP UNITY_LIGHT_PROBE_PROXY_VOLUME UNITY_LIGHTMAP_FULL_HDR uKW=SHADER_STAGE_COMPUTE platform=vulkan flags=4096 reqs=16385 forceDXC=0 forceFXC=0  error: 1 plat 18 at FluidComputeShader.compute(32): use of potentially uninitialized variable (checkIfCellIsValid)
+ ok=1 outsize=25660
+
+Cmd: compileComputeKernel
+  insize=6035 file=Assets/Shaders/FluidComputeShader.compute kernel=SolveIncompressibilityBlack ppOnly=0 stripLineD=0 buildPlatform=24 km=<UNITY_VERSION=202239> pKW=UNITY_ENABLE_REFLECTION_BUFFERS UNITY_USE_DITHER_MASK_FOR_ALPHABLENDED_SHADOWS UNITY_PBS_USE_BRDF1 UNITY_SPECCUBE_BOX_PROJECTION UNITY_SPECCUBE_BLENDING UNITY_ENABLE_DETAIL_NORMALMAP SHADER_API_DESKTOP UNITY_LIGHT_PROBE_PROXY_VOLUME UNITY_LIGHTMAP_FULL_HDR uKW=SHADER_STAGE_COMPUTE platform=vulkan flags=4096 reqs=16385 forceDXC=0 forceFXC=0  error: 1 plat 18 at FluidComputeShader.compute(32): use of potentially uninitialized variable (checkIfCellIsValid)
+  error: 1 plat 18 at FluidComputeShader.compute(124): integer modulus may be much slower, try using uints if possible.
+ ok=1 outsize=10205
+
+Cmd: compileComputeKernel
+  insize=6035 file=Assets/Shaders/FluidComputeShader.compute kernel=SolveIncompressibilityRed ppOnly=0 stripLineD=0 buildPlatform=24 km=<UNITY_VERSION=202239> pKW=UNITY_ENABLE_REFLECTION_BUFFERS UNITY_USE_DITHER_MASK_FOR_ALPHABLENDED_SHADOWS UNITY_PBS_USE_BRDF1 UNITY_SPECCUBE_BOX_PROJECTION UNITY_SPECCUBE_BLENDING UNITY_ENABLE_DETAIL_NORMALMAP SHADER_API_DESKTOP UNITY_LIGHT_PROBE_PROXY_VOLUME UNITY_LIGHTMAP_FULL_HDR uKW=SHADER_STAGE_COMPUTE platform=vulkan flags=4096 reqs=16385 forceDXC=0 forceFXC=0  error: 1 plat 18 at FluidComputeShader.compute(32): use of potentially uninitialized variable (checkIfCellIsValid)
+  error: 1 plat 18 at FluidComputeShader.compute(124): integer modulus may be much slower, try using uints if possible.
+ ok=1 outsize=10315
+
+Cmd: compileComputeKernel
+  insize=6035 file=Assets/Shaders/FluidComputeShader.compute kernel=ApplyAdvection ppOnly=0 stripLineD=0 buildPlatform=24 km=<UNITY_VERSION=202239> pKW=UNITY_ENABLE_REFLECTION_BUFFERS UNITY_USE_DITHER_MASK_FOR_ALPHABLENDED_SHADOWS UNITY_PBS_USE_BRDF1 UNITY_SPECCUBE_BOX_PROJECTION UNITY_SPECCUBE_BLENDING UNITY_ENABLE_DETAIL_NORMALMAP SHADER_API_DESKTOP UNITY_LIGHT_PROBE_PROXY_VOLUME UNITY_LIGHTMAP_FULL_HDR uKW=SHADER_STAGE_COMPUTE platform=glcore flags=4096 reqs=16385 forceDXC=0 forceFXC=0  error: 1 plat 15 at FluidComputeShader.compute(32): use of potentially uninitialized variable (checkIfCellIsValid)
+ ok=1 outsize=11867
+
+Cmd: compileComputeKernel
+  insize=6035 file=Assets/Shaders/FluidComputeShader.compute kernel=SolveIncompressibilityBlack ppOnly=0 stripLineD=0 buildPlatform=24 km=<UNITY_VERSION=202239> pKW=UNITY_ENABLE_REFLECTION_BUFFERS UNITY_USE_DITHER_MASK_FOR_ALPHABLENDED_SHADOWS UNITY_PBS_USE_BRDF1 UNITY_SPECCUBE_BOX_PROJECTION UNITY_SPECCUBE_BLENDING UNITY_ENABLE_DETAIL_NORMALMAP SHADER_API_DESKTOP UNITY_LIGHT_PROBE_PROXY_VOLUME UNITY_LIGHTMAP_FULL_HDR uKW=SHADER_STAGE_COMPUTE platform=glcore flags=4096 reqs=16385 forceDXC=0 forceFXC=0  error: 1 plat 15 at FluidComputeShader.compute(32): use of potentially uninitialized variable (checkIfCellIsValid)
+  error: 1 plat 15 at FluidComputeShader.compute(124): integer modulus may be much slower, try using uints if possible.
+ ok=1 outsize=6374
+
+Cmd: compileComputeKernel
+  insize=6035 file=Assets/Shaders/FluidComputeShader.compute kernel=SolveIncompressibilityRed ppOnly=0 stripLineD=0 buildPlatform=24 km=<UNITY_VERSION=202239> pKW=UNITY_ENABLE_REFLECTION_BUFFERS UNITY_USE_DITHER_MASK_FOR_ALPHABLENDED_SHADOWS UNITY_PBS_USE_BRDF1 UNITY_SPECCUBE_BOX_PROJECTION UNITY_SPECCUBE_BLENDING UNITY_ENABLE_DETAIL_NORMALMAP SHADER_API_DESKTOP UNITY_LIGHT_PROBE_PROXY_VOLUME UNITY_LIGHTMAP_FULL_HDR uKW=SHADER_STAGE_COMPUTE platform=glcore flags=4096 reqs=16385 forceDXC=0 forceFXC=0  error: 1 plat 15 at FluidComputeShader.compute(32): use of potentially uninitialized variable (checkIfCellIsValid)
+  error: 1 plat 15 at FluidComputeShader.compute(124): integer modulus may be much slower, try using uints if possible.
+ ok=1 outsize=6453
+
+Cmd: compileComputeKernel
+  insize=6440 file=Assets/Shaders/FluidComputeShader.compute kernel=ApplyAdvection ppOnly=0 stripLineD=0 buildPlatform=24 km=<UNITY_VERSION=202239> pKW=UNITY_ENABLE_REFLECTION_BUFFERS UNITY_USE_DITHER_MASK_FOR_ALPHABLENDED_SHADOWS UNITY_PBS_USE_BRDF1 UNITY_SPECCUBE_BOX_PROJECTION UNITY_SPECCUBE_BLENDING UNITY_ENABLE_DETAIL_NORMALMAP SHADER_API_DESKTOP UNITY_LIGHT_PROBE_PROXY_VOLUME UNITY_LIGHTMAP_FULL_HDR uKW=SHADER_STAGE_COMPUTE platform=vulkan flags=4096 reqs=16385 forceDXC=0 forceFXC=0  error: 1 plat 18 at FluidComputeShader.compute(32): use of potentially uninitialized variable (checkIfCellIsValid)
+ ok=1 outsize=35724
+
+Cmd: compileComputeKernel
+  insize=6440 file=Assets/Shaders/FluidComputeShader.compute kernel=SolveIncompressibilityBlack ppOnly=0 stripLineD=0 buildPlatform=24 km=<UNITY_VERSION=202239> pKW=UNITY_ENABLE_REFLECTION_BUFFERS UNITY_USE_DITHER_MASK_FOR_ALPHABLENDED_SHADOWS UNITY_PBS_USE_BRDF1 UNITY_SPECCUBE_BOX_PROJECTION UNITY_SPECCUBE_BLENDING UNITY_ENABLE_DETAIL_NORMALMAP SHADER_API_DESKTOP UNITY_LIGHT_PROBE_PROXY_VOLUME UNITY_LIGHTMAP_FULL_HDR uKW=SHADER_STAGE_COMPUTE platform=vulkan flags=4096 reqs=16385 forceDXC=0 forceFXC=0  error: 1 plat 18 at FluidComputeShader.compute(32): use of potentially uninitialized variable (checkIfCellIsValid)
+  error: 1 plat 18 at FluidComputeShader.compute(124): integer modulus may be much slower, try using uints if possible.
+ ok=1 outsize=10205
+
+Cmd: compileComputeKernel
+  insize=6440 file=Assets/Shaders/FluidComputeShader.compute kernel=SolveIncompressibilityRed ppOnly=0 stripLineD=0 buildPlatform=24 km=<UNITY_VERSION=202239> pKW=UNITY_ENABLE_REFLECTION_BUFFERS UNITY_USE_DITHER_MASK_FOR_ALPHABLENDED_SHADOWS UNITY_PBS_USE_BRDF1 UNITY_SPECCUBE_BOX_PROJECTION UNITY_SPECCUBE_BLENDING UNITY_ENABLE_DETAIL_NORMALMAP SHADER_API_DESKTOP UNITY_LIGHT_PROBE_PROXY_VOLUME UNITY_LIGHTMAP_FULL_HDR uKW=SHADER_STAGE_COMPUTE platform=vulkan flags=4096 reqs=16385 forceDXC=0 forceFXC=0  error: 1 plat 18 at FluidComputeShader.compute(32): use of potentially uninitialized variable (checkIfCellIsValid)
+  error: 1 plat 18 at FluidComputeShader.compute(124): integer modulus may be much slower, try using uints if possible.
+ ok=1 outsize=10315
+

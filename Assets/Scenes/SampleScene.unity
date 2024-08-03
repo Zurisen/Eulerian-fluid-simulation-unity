@@ -224,7 +224,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 2013396394087031028, guid: 2a79906418362e1f8b64976f6d314fad, type: 3}
       propertyPath: CellSize
-      value: 2
+      value: 0.2
       objectReference: {fileID: 0}
     - target: {fileID: 2013396394087031028, guid: 2a79906418362e1f8b64976f6d314fad, type: 3}
       propertyPath: SideBlast

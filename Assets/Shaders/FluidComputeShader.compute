@@ -72,14 +72,15 @@ float2 AverageVector(int i, int j)
 
 float InterpolateField(float x, float y, RWStructuredBuffer<float2> field, int component)
 {
-    float h2 = h / 2.0f;
+    float dx = component==1 ? h/2 : 0;
+    float dy = component==0 ? h/2 : 0;
 
-    float x0 = clamp(floor((x - h2) / h), 0.0f, float(numCellsX - 1));
-    float tx = ((x - h2) - x0 * h) / h;
+    float x0 = clamp(floor((x - dx) / h), 0.0f, float(numCellsX - 1));
+    float tx = ((x - dx) - x0 * h) / h;
     float x1 = min(x0 + 1.0f, float(numCellsX - 1));
 
-    float y0 = clamp(floor((y - h2) / h), 0.0f, float(numCellsY - 1));
-    float ty = ((y - h2) - y0 * h) / h;
+    float y0 = clamp(floor((y - dy) / h), 0.0f, float(numCellsY - 1));
+    float ty = ((y - dy) - y0 * h) / h;
     float y1 = min(y0 + 1.0f, float(numCellsY - 1));
 
     float sx = 1.0f - tx;
@@ -195,6 +196,17 @@ void ApplyAdvection(uint3 id : SV_DispatchThreadID)
         float u = InterpolateField(x_u, y_u, cellVel, 0);
 
         float x_v = i * h + h / 2.0f - avg.x * deltaTime;
+        float y_v = j * h - cellVel[n].y * deltaTime;
+        float v = InterpolateField(x_v, y_v, cellVel, 1);
+
+        cellVel[n] = float2(u, v);
+    } else {
+
+        float x_u = i * h - cellVel[n].x * deltaTime;
+        float y_u = j * h + h / 2.0f - cellVel[n].y * deltaTime;
+        float u = InterpolateField(x_u, y_u, cellVel, 0);
+
+        float x_v = i * h + h / 2.0f - cellVel[n].x * deltaTime;
         float y_v = j * h - cellVel[n].y * deltaTime;
         float v = InterpolateField(x_v, y_v, cellVel, 1);
 
